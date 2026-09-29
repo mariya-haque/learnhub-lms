@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Students · {{ course.title }}{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block page_subtitle %}<a href="/teach/courses/{{ course.id }}" style="color:var(--accent)">{{ course.title }}</a> · {{ rows|length }} enrolled{% endblock %}
+
+{% block content %}
+
+{% if rows %}
+<div class="table-wrap">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Student</th>
+                <th>Lecture progress</th>
+                <th class="num">Tests taken</th>
+                <th class="num">Average</th>
+                <th>Enrolled</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    <div class="row" style="gap:10px">
+                        <div class="avatar">{{ row.student.initial }}</div>
+                        <div class="stack">
+                            <span class="strong">{{ row.student.display_name }}</span>
+                            <span class="tiny faint">{{ row.student.email or row.student.username }}</span>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="row" style="gap:10px">
+                        <div class="progress" style="width:110px">
+                            <div class="progress-bar {{ 'success' if row.progress.percent == 100 }}" style="width: {{ row.progress.percent }}%"></div>
+                        </div>
+                        <span class="small nums">{{ row.progress.completed }}/{{ row.progress.total }}</span>
+                    </div>
+                </td>
+                <td class="num nums">{{ row.attempts }}</td>
+                <td class="num">
+                    {% if row.attempts %}
+                    <span class="badge {{ 'badge-success' if row.average >= 60 else ('badge-warn' if row.average >= 40 else 'badge-error') }}">
+                        {{ row.average }}%
+                    </span>
+                    {% else %}
+                    <span class="faint">--</span>
+                    {% endif %}
+                </td>
+                <td class="small muted">{{ row.enrolled_at.strftime('%d %b %Y') if row.enrolled_at else '--' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg>
+    </div>
+    <div class="empty-title">Nobody has enrolled yet</div>
+    <p class="empty-desc">
+        {% if not course.is_published %}
+            This course is still a draft — publish it so students can find and enroll in it.
+        {% else %}
+            Students who enroll from the catalogue will appear here, along with their progress.
+        {% endif %}
+    </p>
+    <a href="/teach/courses/{{ course.id }}" class="btn mt">Back to the course</a>
+</div>
+{% endif %}
+
+{% endblock %}

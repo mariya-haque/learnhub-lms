@@ -1,0 +1,101 @@
+{% extends "auth_base.html" %}
+{% block title %}Create an account · {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1 class="auth-title">Create your account</h1>
+<p class="auth-caption">Pick how you'll use {{ app_name }} — you can't change it later.</p>
+
+{% if error %}
+<div class="alert" role="alert">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg>
+    <span>{{ error }}</span>
+</div>
+{% endif %}
+
+<form method="post" action="/register" autocomplete="on">
+    <div class="field">
+        <span class="label">I am a</span>
+        <div class="radio-cards">
+            <label class="radio-card">
+                <input type="radio" name="role" value="student" {% if role != 'teacher' %}checked{% endif %}>
+                <span class="radio-card-title">
+                    <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cap"/></svg>
+                    Student
+                </span>
+                <span class="radio-card-desc">Watch lectures, read notes, sit tests</span>
+            </label>
+            <label class="radio-card">
+                <input type="radio" name="role" value="teacher" {% if role == 'teacher' %}checked{% endif %}>
+                <span class="radio-card-title">
+                    <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg>
+                    Teacher
+                </span>
+                <span class="radio-card-desc">Publish courses, upload, build tests</span>
+            </label>
+        </div>
+    </div>
+
+    <div class="field">
+        <label class="label" for="full_name">Full name <span class="hint">(optional)</span></label>
+        <input class="input" type="text" id="full_name" name="full_name" value="{{ full_name or '' }}"
+               placeholder="Aarav Patel" autocomplete="name">
+    </div>
+
+    <div class="field">
+        <label class="label" for="username">Username</label>
+        <div class="input-group">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-user"/></svg>
+            <input class="input" type="text" id="username" name="username" value="{{ username or '' }}"
+                   placeholder="aarav.p" required minlength="3" maxlength="32"
+                   pattern="[A-Za-z0-9_.\-]{3,32}" autocomplete="username">
+        </div>
+        <span class="hint">3–32 characters: letters, numbers, dot, dash or underscore.</span>
+    </div>
+
+    <div class="field">
+        <label class="label" for="email">Email <span class="hint">(optional)</span></label>
+        <input class="input" type="email" id="email" name="email" value="{{ email or '' }}"
+               placeholder="you@example.com" autocomplete="email">
+    </div>
+
+    <div class="field-row">
+        <div class="field">
+            <label class="label" for="password">Password</label>
+            <div class="input-group">
+                <input class="input" type="password" id="password" name="password"
+                       placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+                <button type="button" class="input-action" onclick="togglePassword(this)" aria-label="Show password">
+                    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="confirm_password">Confirm</label>
+            <input class="input" type="password" id="confirm_password" name="confirm_password"
+                   placeholder="Repeat it" required minlength="8" autocomplete="new-password">
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-lg btn-block mt">
+        Create account
+        <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-right"/></svg>
+    </button>
+</form>
+
+<p class="auth-foot">Already have an account? <a href="/login">Sign in</a></p>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Catch the mismatch before a round trip rather than after one.
+const form = document.querySelector('form');
+const pw = document.getElementById('password');
+const confirm = document.getElementById('confirm_password');
+
+function checkMatch() {
+  confirm.setCustomValidity(confirm.value && confirm.value !== pw.value ? 'The two passwords do not match.' : '');
+}
+pw.addEventListener('input', checkMatch);
+confirm.addEventListener('input', checkMatch);
+</script>
+{% endblock %}

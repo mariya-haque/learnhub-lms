@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Courses · {{ app_name }}{% endblock %}
+{% block page_title %}Course catalogue{% endblock %}
+{% block page_subtitle %}{{ cards|length }} course{{ '' if cards|length == 1 else 's' }} published{% endblock %}
+
+{% block content %}
+
+<form method="get" action="/courses" class="row wrap mb" style="gap:10px">
+    <div class="input-group" style="flex:1;min-width:220px;max-width:380px">
+        <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-search"/></svg>
+        <input class="input" type="search" name="q" value="{{ q }}" placeholder="Search courses...">
+    </div>
+    <select class="select" name="subject" style="max-width:200px" onchange="this.form.submit()">
+        <option value="">All subjects</option>
+        {% for item in subjects %}
+        <option value="{{ item }}" {% if item == subject %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn">Search</button>
+    {% if q or subject %}
+    <a href="/courses" class="btn btn-ghost">Clear</a>
+    {% endif %}
+</form>
+
+{% if cards %}
+<div class="grid grid-3">
+    {% for card in cards %}
+    <div class="course-card" data-row>
+        <a href="/courses/{{ card.course.slug }}">
+            <div class="course-cover {{ card.course.accent }}">
+                <span class="course-cover-subject">{{ card.course.subject or 'Course' }}</span>
+                <span class="course-cover-mark">
+                    <svg width="40" height="40" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-book"/></svg>
+                </span>
+            </div>
+        </a>
+        <div class="course-body">
+            <a href="/courses/{{ card.course.slug }}" class="course-title">{{ card.course.title }}</a>
+            <p class="course-desc">{{ card.course.description or 'No description yet.' }}</p>
+            <div class="course-meta">
+                <span>
+                    <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+                    {{ card.stats.lectures }} lectures
+                </span>
+                <span>
+                    <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                    {{ card.stats.tests }} tests
+                </span>
+                <span>
+                    <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg>
+                    {{ card.stats.students }}
+                </span>
+                {% if card.rating.count %}
+                <span title="{{ card.rating.count }} review{{ '' if card.rating.count == 1 else 's' }}">
+                    <span class="stars tiny">★</span>
+                    <span class="nums">{{ card.rating.average }}</span>
+                    <span class="muted">({{ card.rating.count }})</span>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="course-foot">
+            <div class="avatar" style="width:26px;height:26px;font-size:11px">{{ card.course.teacher.initial }}</div>
+            <span class="tiny muted truncate" style="flex:1">{{ card.course.teacher.display_name }}</span>
+            {% if card.enrolled %}
+            <a href="/courses/{{ card.course.slug }}" class="btn btn-sm btn-soft">
+                <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                Enrolled
+            </a>
+            {% elif current_user.is_teacher %}
+            <a href="/courses/{{ card.course.slug }}" class="btn btn-sm btn-outline">View</a>
+            {% else %}
+            <button class="btn btn-sm" onclick="enroll(this, {{ card.course.id }}, '{{ card.course.slug }}')">Enroll</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-search"/></svg>
+    </div>
+    <div class="empty-title">Nothing matches</div>
+    <p class="empty-desc">
+        {% if q or subject %}
+            No published course matches that filter. Try a broader search.
+        {% else %}
+            No courses have been published yet.
+            {% if current_user.is_teacher %}Create one from the studio to get started.{% endif %}
+        {% endif %}
+    </p>
+    {% if q or subject %}<a href="/courses" class="btn mt">Clear filters</a>{% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function enroll(button, courseId, slug) {
+  setLoading(button, true);
+  try {
+    await api(`/courses/${courseId}/enroll`, { method: 'POST' });
+    showToast('Enrolled. Opening the course...', 'success');
+    setTimeout(() => { window.location.href = `/courses/${slug}`; }, 550);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+</script>
+{% endblock %}

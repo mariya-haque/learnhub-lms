@@ -1,0 +1,726 @@
+{% extends "base.html" %}
+{% block title %}Manage {{ course.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ course.title }}{% endblock %}
+{% block page_subtitle %}Managing content · <a href="/courses/{{ course.slug }}" style="color:var(--accent)">view as a student</a>{% endblock %}
+
+{% block content %}
+
+<div class="row-between wrap mb">
+    <div class="row wrap" style="gap:8px">
+        <span class="badge {{ 'badge-success' if course.is_published else 'badge-muted' }}">
+            {{ 'Published' if course.is_published else 'Draft' }}
+        </span>
+        <span class="badge badge-muted">{{ stats.students }} enrolled</span>
+        <span class="badge badge-muted">{{ stats.lectures }} lectures</span>
+        <span class="badge badge-muted">{{ stats.tests }} tests</span>
+    </div>
+    <div class="btn-group">
+        <a href="/teach/courses/{{ course.id }}/students" class="btn btn-outline btn-sm">
+            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg>
+            Students
+        </a>
+        <button class="btn btn-outline btn-sm" onclick="showModal('settings-modal')">
+            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg>
+            Settings
+        </button>
+        <button class="btn btn-sm {{ 'btn-outline' if course.is_published else '' }}" id="publish-btn"
+                onclick="togglePublish()">
+            {{ 'Unpublish' if course.is_published else 'Publish course' }}
+        </button>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab active" data-panel="lectures">
+        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+        Lectures <span class="tab-count">{{ lectures|length }}</span>
+    </button>
+    <button class="tab" data-panel="notes">
+        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file"/></svg>
+        Notes <span class="tab-count">{{ notes|length }}</span>
+    </button>
+    <button class="tab" data-panel="tests">
+        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+        Tests <span class="tab-count">{{ tests|length }}</span>
+    </button>
+    <button class="tab" data-panel="chapters">
+        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-list"/></svg>
+        Chapters <span class="tab-count">{{ chapters|length }}</span>
+    </button>
+</div>
+
+{# ====================== LECTURES ====================== #}
+<section data-panel-body="lectures">
+    <div class="split">
+        <div class="card card-flush">
+            <div class="card-head">
+                <span class="section-title">Lecture order</span>
+                <span class="section-sub">Students watch top to bottom</span>
+            </div>
+            {% if lectures %}
+            <div class="lecture-list" id="lecture-list">
+                {% for lecture in lectures %}
+                <div class="lecture-item" data-row data-lecture="{{ lecture.id }}">
+                    <div class="lecture-index">{{ loop.index }}</div>
+                    <div class="stack" style="flex:1;min-width:0">
+                        <span class="lecture-title truncate">{{ lecture.title }}</span>
+                        <span class="lecture-sub truncate">
+                            <span class="badge badge-muted tiny">{{ 'Upload' if lecture.source_type.value == 'upload' else 'Link' }}</span>
+                            {{ lecture.original_filename or lecture.video_url or '' }}
+                        </span>
+                    </div>
+                    <div class="lecture-actions">
+                        {% if not lecture.is_published %}<span class="badge badge-muted">Draft</span>{% endif %}
+                        <button class="btn btn-icon btn-ghost" title="Move up" onclick="move({{ lecture.id }}, -1)">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-up"/></svg>
+                        </button>
+                        <button class="btn btn-icon btn-ghost" title="Move down" onclick="move({{ lecture.id }}, 1)">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+                        </button>
+                        <a href="/learn/{{ lecture.id }}" class="btn btn-icon btn-ghost" title="Preview">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg>
+                        </a>
+                        <button class="btn btn-icon btn-ghost" title="Delete"
+                                data-delete="/teach/api/lectures/{{ lecture.id }}"
+                                data-confirm-title="Delete this lecture?"
+                                data-confirm-message="{{ lecture.title }} and its watch history will be removed. Any uploaded video file is deleted too."
+                                data-success-message="Lecture deleted.">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">
+                <div class="empty-icon">
+                    <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+                </div>
+                <div class="empty-title">No lectures yet</div>
+                <p class="empty-desc">Upload a video file or paste a YouTube / Vimeo link to add the first one.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="rail">
+            <div class="card">
+                <div class="tabs" style="margin-bottom:14px">
+                    <button class="tab active" data-source="url">Paste a link</button>
+                    <button class="tab" data-source="upload">Upload a file</button>
+                </div>
+
+                {# --- URL lecture --- #}
+                <form id="url-form" data-source-body="url">
+                    <div class="field">
+                        <label class="label" for="u-title">Title</label>
+                        <input class="input" id="u-title" required minlength="2" placeholder="Lecture 1 — Introduction">
+                    </div>
+                    <div class="field">
+                        <label class="label" for="u-url">Video link</label>
+                        <div class="input-group">
+                            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-link"/></svg>
+                            <input class="input" id="u-url" required placeholder="https://youtube.com/watch?v=...">
+                        </div>
+                        <span class="hint">YouTube, Vimeo, or a direct .mp4 URL.</span>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="u-desc">Description <span class="hint">(optional)</span></label>
+                        <textarea class="textarea" id="u-desc" style="min-height:64px"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-block">Add lecture</button>
+                </form>
+
+                {# --- Upload lecture --- #}
+                <form id="upload-form" data-source-body="upload" style="display:none">
+                    <div class="field">
+                        <label class="label" for="f-title">Title</label>
+                        <input class="input" id="f-title" placeholder="Leave blank to use the filename">
+                    </div>
+
+                    <label class="dropzone" id="video-drop">
+                        <input type="file" id="video-file" accept=".mp4,.webm,.mov,.m4v,.ogv">
+                        <span class="dropzone-icon">
+                            <svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-upload"/></svg>
+                        </span>
+                        <span class="dropzone-title" id="video-drop-title">Drop a video here</span>
+                        <span class="dropzone-hint">or click to browse · max {{ max_video_mb }} MB</span>
+                    </label>
+
+                    <div class="upload-progress" id="video-progress">
+                        <div class="upload-progress-head">
+                            <span id="video-progress-label">Uploading...</span>
+                            <span class="nums" id="video-progress-pct">0%</span>
+                        </div>
+                        <div class="progress"><div class="progress-bar" id="video-progress-bar" style="width:0%"></div></div>
+                    </div>
+
+                    <div class="field mt">
+                        <label class="label" for="f-desc">Description <span class="hint">(optional)</span></label>
+                        <textarea class="textarea" id="f-desc" style="min-height:64px"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-block">Upload lecture</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ====================== NOTES ====================== #}
+<section data-panel-body="notes" style="display:none">
+    <div class="split">
+        <div class="card card-flush">
+            <div class="card-head"><span class="section-title">Uploaded notes</span></div>
+            {% if notes %}
+            <div>
+                {% for note in notes %}
+                <div class="note-item" data-row>
+                    <span class="file-chip">{{ note.extension[:4] }}</span>
+                    <div class="stack" style="flex:1;min-width:0">
+                        <span class="lecture-title truncate">{{ note.title }}</span>
+                        <span class="lecture-sub">
+                            {{ note.file_size|filesize }}
+                            {% if note.lecture %} · attached to {{ note.lecture.title }}{% else %} · course-wide{% endif %}
+                        </span>
+                    </div>
+                    <div class="lecture-actions">
+                        <a href="/files/note/{{ note.id }}" class="btn btn-icon btn-ghost" title="Download">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg>
+                        </a>
+                        <button class="btn btn-icon btn-ghost" title="Delete"
+                                data-delete="/teach/api/notes/{{ note.id }}"
+                                data-confirm-title="Delete this note?"
+                                data-confirm-message="{{ note.original_filename }} will be removed from the server."
+                                data-success-message="Note deleted.">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">
+                <div class="empty-icon">
+                    <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file"/></svg>
+                </div>
+                <div class="empty-title">No notes yet</div>
+                <p class="empty-desc">Upload PDFs, slides or worksheets. Students can only download them once enrolled.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="rail">
+            <div class="card">
+                <span class="section-title">Upload a note</span>
+                <form id="note-form" class="mt">
+                    <div class="field">
+                        <label class="label" for="n-title">Title</label>
+                        <input class="input" id="n-title" placeholder="Leave blank to use the filename">
+                    </div>
+                    <div class="field">
+                        <label class="label" for="n-lecture">Attach to</label>
+                        <select class="select" id="n-lecture">
+                            <option value="">The whole course</option>
+                            {% for lecture in lectures %}
+                            <option value="{{ lecture.id }}">{{ lecture.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <label class="dropzone" id="note-drop">
+                        <input type="file" id="note-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.zip">
+                        <span class="dropzone-icon">
+                            <svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file"/></svg>
+                        </span>
+                        <span class="dropzone-title" id="note-drop-title">Drop a file here</span>
+                        <span class="dropzone-hint">PDF, DOCX, PPTX, images · max {{ max_note_mb }} MB</span>
+                    </label>
+
+                    <div class="upload-progress" id="note-progress">
+                        <div class="upload-progress-head">
+                            <span id="note-progress-label">Uploading...</span>
+                            <span class="nums" id="note-progress-pct">0%</span>
+                        </div>
+                        <div class="progress"><div class="progress-bar" id="note-progress-bar" style="width:0%"></div></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-block mt">Upload note</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ====================== TESTS ====================== #}
+<section data-panel-body="tests" style="display:none">
+    <div class="section-head">
+        <div class="stack">
+            <span class="section-title">Tests in this course</span>
+            <span class="section-sub">Practice tests are untimed and repeatable; grand tests are timed and count once</span>
+        </div>
+        <button class="btn" onclick="showModal('new-test-modal')">
+            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+            New test
+        </button>
+    </div>
+
+    {% if tests %}
+    <div class="grid grid-2">
+        {% for test in tests %}
+        {% set summary = test_summaries[test.id] %}
+        <div class="card" data-row>
+            <div class="row-between mb">
+                <span class="badge badge-{{ test.kind.value }}">{{ test.kind.value|title }}</span>
+                <span class="badge {{ 'badge-success' if test.is_published else 'badge-muted' }}">
+                    {{ 'Live' if test.is_published else 'Draft' }}
+                </span>
+            </div>
+            <div class="stack">
+                <span class="strong">{{ test.title }}</span>
+                <span class="small muted">{{ test.question_count }} questions · {{ test.total_marks }} marks
+                    {%- if test.duration_minutes %} · {{ test.duration_minutes }} min{% endif %}</span>
+            </div>
+
+            {% if summary.attempts %}
+            <div class="row wrap mt" style="gap:8px;padding-top:12px;border-top:1px solid var(--border-light)">
+                <span class="badge badge-muted">{{ summary.attempts }} submissions</span>
+                <span class="badge badge-info">avg {{ summary.average }}%</span>
+                <span class="badge badge-success">{{ summary.pass_rate }}% passed</span>
+            </div>
+            {% else %}
+            <p class="tiny faint mt">No submissions yet — questions are still editable.</p>
+            {% endif %}
+
+            <div class="btn-group mt">
+                <a href="/teach/tests/{{ test.id }}/edit" class="btn btn-sm btn-outline">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg>
+                    {{ 'View' if summary.attempts else 'Edit' }}
+                </a>
+                <a href="/teach/tests/{{ test.id }}/results" class="btn btn-sm btn-ghost">Results</a>
+                <button class="btn btn-sm btn-ghost" style="margin-left:auto"
+                        data-delete="/teach/api/tests/{{ test.id }}"
+                        data-confirm-title="Delete this test?"
+                        data-confirm-message="All {{ summary.attempts }} student attempt(s) and their scores will be deleted too."
+                        data-success-message="Test deleted.">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card empty">
+        <div class="empty-icon">
+            <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+        </div>
+        <div class="empty-title">No tests yet</div>
+        <p class="empty-desc">Create a practice test for self-checking, and a grand test for the real thing.</p>
+        <button class="btn mt" onclick="showModal('new-test-modal')">Create a test</button>
+    </div>
+    {% endif %}
+</section>
+
+{# ====================== CHAPTERS ====================== #}
+<section data-panel-body="chapters" style="display:none">
+    <div class="section-head">
+        <div class="stack">
+            <span class="section-title">Chapters</span>
+            <span class="section-sub">
+                Group this subject's videos, notes and tests into units. Anything
+                you don't file stays in <em>Unfiled</em> and still works.
+            </span>
+        </div>
+        <form class="row" style="gap:8px" id="new-chapter-form">
+            <input class="input" id="new-chapter-title" placeholder="Chapter title"
+                   maxlength="160" required style="min-width:200px">
+            <button type="submit" class="btn btn-sm">
+                <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+                Add chapter
+            </button>
+        </form>
+    </div>
+
+    {% for group in outline %}
+    <div class="card mb" data-row>
+        <div class="row-between wrap mb" style="gap:10px">
+            <div class="row" style="gap:8px;flex:1;min-width:0">
+                {% if group.chapter %}
+                <span class="chapter-index">{{ loop.index }}</span>
+                <input class="input input-inline" value="{{ group.chapter.title }}"
+                       data-rename="{{ group.chapter.id }}" maxlength="160"
+                       aria-label="Chapter title">
+                {% else %}
+                <span class="chapter-index muted">—</span>
+                <span class="strong">Unfiled</span>
+                {% endif %}
+            </div>
+            <div class="row" style="gap:6px">
+                <span class="badge badge-muted">{{ group.count }}</span>
+                {% if group.chapter %}
+                <button class="btn btn-ghost btn-icon btn-sm"
+                        data-delete="/teach/api/chapters/{{ group.chapter.id }}"
+                        data-confirm-title="Delete this chapter?"
+                        data-confirm-message="Its videos, notes and tests are kept — they move to Unfiled."
+                        data-success-message="Chapter deleted."
+                        aria-label="Delete chapter">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% set items = [] %}
+        {% for x in group.lectures %}{% set _ = items.append(('lecture', x.id, x.title, 'play-circle', 'video')) %}{% endfor %}
+        {% for x in group.practice %}{% set _ = items.append(('test', x.id, x.title, 'clipboard', 'practice')) %}{% endfor %}
+        {% for x in group.grand %}{% set _ = items.append(('test', x.id, x.title, 'timer', 'grand')) %}{% endfor %}
+        {% for x in group.notes %}{% set _ = items.append(('note', x.id, x.title, 'file', 'note')) %}{% endfor %}
+
+        {% if items %}
+        <div class="stack" style="gap:6px">
+            {% for kind, item_id, title, icon_name, tone in items %}
+            <div class="content-row static">
+                <span class="content-icon {{ tone }}">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-{{ icon_name }}"/></svg>
+                </span>
+                <span class="ellipsis" style="flex:1">{{ title }}</span>
+                <select class="input input-inline" data-assign-kind="{{ kind }}"
+                        data-assign-id="{{ item_id }}" aria-label="Move to chapter">
+                    <option value="">Unfiled</option>
+                    {% for chapter in chapters %}
+                    <option value="{{ chapter.id }}"
+                        {% if group.chapter and chapter.id == group.chapter.id %}selected{% endif %}>
+                        {{ chapter.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="tiny muted">Nothing filed here yet.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if not outline %}
+    <div class="card empty">
+        <div class="empty-icon">
+            <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-list"/></svg>
+        </div>
+        <div class="empty-title">No chapters yet</div>
+        <p class="empty-desc">
+            Add a chapter above — "Kinematics", "Thermodynamics" — then file this
+            subject's content into it from the dropdown on each item.
+        </p>
+    </div>
+    {% endif %}
+</section>
+
+{# ---------- Course settings ---------- #}
+<div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+        <h3 class="modal-title">Course settings</h3>
+        <p class="modal-desc">Changing the title changes the public URL.</p>
+        <form id="settings-form">
+            <div class="field">
+                <label class="label" for="s-title">Title</label>
+                <input class="input" id="s-title" value="{{ course.title }}" required minlength="2">
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label class="label" for="s-subject">Subject</label>
+                    <input class="input" id="s-subject" value="{{ course.subject or '' }}">
+                </div>
+                <div class="field">
+                    <label class="label" for="s-accent">Cover colour</label>
+                    <select class="select" id="s-accent">
+                        {% for name in ['indigo','teal','rose','amber','purple','blue'] %}
+                        <option value="{{ name }}" {% if course.accent == name %}selected{% endif %}>{{ name|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="s-desc">Description</label>
+                <textarea class="textarea" id="s-desc">{{ course.description or '' }}</textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" style="margin-right:auto"
+                        data-delete="/teach/api/courses/{{ course.id }}"
+                        data-confirm-title="Delete this whole course?"
+                        data-confirm-message="Every lecture, note, test and student result in {{ course.title }} will be permanently deleted."
+                        data-confirm-label="Delete course"
+                        data-redirect="/teach">
+                    Delete course
+                </button>
+                <button type="button" class="btn btn-outline" onclick="hideModal('settings-modal')">Cancel</button>
+                <button type="submit" class="btn">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ---------- New test ---------- #}
+<div class="modal-overlay" id="new-test-modal">
+    <div class="modal">
+        <h3 class="modal-title">New test</h3>
+        <p class="modal-desc">You'll add questions on the next screen.</p>
+        <form id="new-test-form">
+            <div class="field">
+                <span class="label">Kind</span>
+                <div class="radio-cards">
+                    <label class="radio-card">
+                        <input type="radio" name="kind" value="practice" checked>
+                        <span class="radio-card-title">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                            Practice
+                        </span>
+                        <span class="radio-card-desc">Untimed, unlimited retries, answers shown as you go</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="kind" value="grand">
+                        <span class="radio-card-title">
+                            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-timer"/></svg>
+                            Grand
+                        </span>
+                        <span class="radio-card-desc">Timed, one attempt, answers hidden until submitted</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label" for="t-title">Title</label>
+                <input class="input" id="t-title" required minlength="2" placeholder="Unit 1 — Practice">
+            </div>
+            <div class="field">
+                <label class="label" for="t-desc">Description</label>
+                <textarea class="textarea" id="t-desc" style="min-height:64px"></textarea>
+            </div>
+            <div class="field-row">
+                <div class="field" id="duration-field" style="display:none">
+                    <label class="label" for="t-duration">Time limit (minutes)</label>
+                    <input class="input nums" type="number" id="t-duration" value="30" min="1" max="600">
+                </div>
+                <div class="field">
+                    <label class="label" for="t-pass">Pass mark (%)</label>
+                    <input class="input nums" type="number" id="t-pass" value="40" min="0" max="100">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="hideModal('new-test-modal')">Cancel</button>
+                <button type="submit" class="btn">Create &amp; add questions</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const COURSE_ID = {{ course.id }};
+const MAX_VIDEO_MB = {{ max_video_mb }};
+const MAX_NOTE_MB = {{ max_note_mb }};
+const LECTURE_IDS = {{ lectures|map(attribute='id')|list|tojson }};
+</script>
+<script src="{{ asset_url('js/upload.js') }}"></script>
+<script>
+/* ------------------------------- Panel tabs ------------------------------ */
+document.querySelectorAll('.tab[data-panel]').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab[data-panel]').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('[data-panel-body]').forEach((panel) => {
+      panel.style.display = panel.dataset.panelBody === tab.dataset.panel ? '' : 'none';
+    });
+  });
+});
+
+/* ---------------------------- Link vs upload ----------------------------- */
+document.querySelectorAll('.tab[data-source]').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab[data-source]').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('[data-source-body]').forEach((form) => {
+      form.style.display = form.dataset.sourceBody === tab.dataset.source ? '' : 'none';
+    });
+  });
+});
+
+/* ------------------------------ URL lecture ------------------------------ */
+document.getElementById('url-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const btn = event.target.querySelector('[type="submit"]');
+  setLoading(btn, true);
+  try {
+    await api(`/teach/api/courses/${COURSE_ID}/lectures/url`, {
+      method: 'POST',
+      body: {
+        title: document.getElementById('u-title').value.trim(),
+        video_url: document.getElementById('u-url').value.trim(),
+        description: document.getElementById('u-desc').value.trim() || null,
+        is_published: true,
+      },
+    });
+    showToast('Lecture added.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(btn, false);
+  }
+});
+
+/* -------------------------------- Reorder -------------------------------- */
+async function move(lectureId, delta) {
+  const ids = [...LECTURE_IDS];
+  const index = ids.indexOf(lectureId);
+  const target = index + delta;
+  if (index < 0 || target < 0 || target >= ids.length) return;
+  [ids[index], ids[target]] = [ids[target], ids[index]];
+  try {
+    await api(`/teach/api/courses/${COURSE_ID}/lectures/reorder`, { method: 'POST', body: { ids } });
+    window.location.reload();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+/* ------------------------------- Publishing ------------------------------ */
+async function togglePublish() {
+  const btn = document.getElementById('publish-btn');
+  const publishing = btn.textContent.trim().startsWith('Publish');
+  setLoading(btn, true);
+  try {
+    await api(`/teach/api/courses/${COURSE_ID}`, { method: 'PUT', body: { is_published: publishing } });
+    showToast(publishing ? 'Course is live.' : 'Course is back to draft.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(btn, false);
+  }
+}
+
+/* -------------------------------- Settings ------------------------------- */
+document.getElementById('settings-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const btn = event.target.querySelector('[type="submit"]');
+  setLoading(btn, true);
+  try {
+    await api(`/teach/api/courses/${COURSE_ID}`, {
+      method: 'PUT',
+      body: {
+        title: document.getElementById('s-title').value.trim(),
+        subject: document.getElementById('s-subject').value.trim() || null,
+        accent: document.getElementById('s-accent').value,
+        description: document.getElementById('s-desc').value.trim() || null,
+      },
+    });
+    showToast('Saved.', 'success');
+    setTimeout(() => window.location.reload(), 450);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(btn, false);
+  }
+});
+
+/* -------------------------------- New test ------------------------------- */
+document.querySelectorAll('input[name="kind"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    document.getElementById('duration-field').style.display =
+      document.querySelector('input[name="kind"]:checked').value === 'grand' ? '' : 'none';
+  });
+});
+
+document.getElementById('new-test-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const btn = event.target.querySelector('[type="submit"]');
+  const kind = document.querySelector('input[name="kind"]:checked').value;
+  setLoading(btn, true);
+  try {
+    const result = await api(`/teach/api/courses/${COURSE_ID}/tests`, {
+      method: 'POST',
+      body: {
+        title: document.getElementById('t-title').value.trim(),
+        description: document.getElementById('t-desc').value.trim() || null,
+        kind,
+        duration_minutes: kind === 'grand' ? Number(document.getElementById('t-duration').value) : null,
+        pass_percent: Number(document.getElementById('t-pass').value),
+        max_attempts: kind === 'grand' ? 1 : null,
+        negative_marking: false,
+        shuffle_questions: false,
+        is_published: false,
+      },
+    });
+    window.location.href = result.redirect;
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(btn, false);
+  }
+});
+
+/* ------------------------------ Chapters -------------------------------- */
+/* COURSE_ID is already declared at the top of this page -- redeclaring it with
+   `const` threw a SyntaxError that killed this whole script block, and with it
+   every button on the page. */
+
+document.getElementById('new-chapter-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const input = document.getElementById('new-chapter-title');
+  const title = input.value.trim();
+  if (!title) return;
+  try {
+    await api(`/teach/api/courses/${COURSE_ID}/chapters`, {
+      method: 'POST',
+      body: { title, is_published: true },
+    });
+    showToast('Chapter added.', 'success');
+    window.location.reload();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+// Renaming saves on blur rather than behind a button -- the field already looks
+// editable, so a Save button next to it would be one click of pure ceremony.
+document.querySelectorAll('[data-rename]').forEach((input) => {
+  const original = input.value;
+  input.addEventListener('blur', async () => {
+    const title = input.value.trim();
+    if (!title || title === original) { input.value = original; return; }
+    try {
+      await api(`/teach/api/chapters/${input.dataset.rename}`, {
+        method: 'PUT',
+        body: { title },
+      });
+      showToast('Chapter renamed.', 'success');
+    } catch (error) {
+      input.value = original;
+      showToast(error.message, 'error');
+    }
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); input.blur(); }
+  });
+});
+
+document.querySelectorAll('[data-assign-kind]').forEach((select) => {
+  select.addEventListener('change', async () => {
+    const value = select.value;
+    try {
+      await api(`/teach/api/courses/${COURSE_ID}/chapters/assign`, {
+        method: 'POST',
+        body: {
+          kind: select.dataset.assignKind,
+          item_id: Number(select.dataset.assignId),
+          chapter_id: value ? Number(value) : null,
+        },
+      });
+      showToast('Moved.', 'success');
+      setTimeout(() => window.location.reload(), 400);
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ test.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ test.title }}{% endblock %}
+{% block page_subtitle %}{{ course.title }} · {{ test.kind.value|title }} test{% endblock %}
+
+{% block content %}
+
+<div class="quiz-topbar">
+    <div class="row" style="gap:12px">
+        <span class="badge badge-{{ test.kind.value }}">
+            <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-{{ 'timer' if test.kind.value == 'grand' else 'clipboard' }}"/></svg>
+            {{ test.kind.value|title }}
+        </span>
+        <span class="small muted nums">
+            <span id="answered-count">0</span> / {{ payload.questions|length }} answered
+        </span>
+        {% if test.negative_marking %}
+        <span class="badge badge-warn">Negative marking</span>
+        {% endif %}
+    </div>
+
+    <div class="row" style="gap:10px">
+        {% if payload.secondsRemaining is not none %}
+        <div class="timer" id="timer">
+            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+            <span id="timer-text">--:--</span>
+        </div>
+        {% else %}
+        <span class="badge badge-muted">
+            <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+            Untimed
+        </span>
+        {% endif %}
+        <button class="btn btn-sm" id="submit-btn">Submit test</button>
+    </div>
+</div>
+
+<div class="quiz-shell">
+    <div>
+        <div id="question-host"></div>
+
+        <div class="quiz-nav">
+            <button class="btn btn-outline" id="prev-btn">
+                <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+                Previous
+            </button>
+            <div class="row" style="gap:8px">
+                <button class="btn btn-ghost" id="flag-btn">
+                    <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-flag"/></svg>
+                    <span id="flag-label">Flag for review</span>
+                </button>
+                <button class="btn" id="next-btn">
+                    Next
+                    <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-right"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {# ---------- Question palette ---------- #}
+    <div class="rail">
+        <div class="card">
+            <div class="row-between mb">
+                <span class="section-title">Questions</span>
+                <span class="badge badge-muted nums">{{ payload.questions|length }}</span>
+            </div>
+            <div class="palette-grid" id="palette"></div>
+
+            <div class="legend">
+                <div class="legend-item"><span class="legend-swatch answered"></span> Answered</div>
+                <div class="legend-item"><span class="legend-swatch flagged"></span> Flagged for review</div>
+                <div class="legend-item"><span class="legend-swatch"></span> Not answered</div>
+            </div>
+
+            <button class="btn btn-block mt" id="submit-btn-2">Submit test</button>
+            <p class="tiny faint" style="margin-top:8px;text-align:center" id="autosave-note">
+                Answers save as you go.
+            </p>
+        </div>
+
+        <div class="card">
+            <span class="section-title">Shortcuts</span>
+            <div class="legend" style="margin-top:10px">
+                <div class="legend-item"><span class="kbd">1</span>–<span class="kbd">9</span> pick an option</div>
+                <div class="legend-item"><span class="kbd">←</span> <span class="kbd">→</span> move between questions</div>
+                <div class="legend-item"><span class="kbd">F</span> flag for review</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---------- Submit confirmation ---------- #}
+<div class="modal-overlay" id="submit-modal">
+    <div class="modal" style="max-width:420px">
+        <h3 class="modal-title">Submit this test?</h3>
+        <p class="modal-desc" id="submit-summary">Checking your answers...</p>
+        <div id="submit-warning"></div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="hideModal('submit-modal')">Keep working</button>
+            <button type="button" class="btn" id="submit-confirm">Submit now</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script id="quiz-data" type="application/json">{{ payload|tojson }}</script>
+<script src="{{ asset_url('js/quiz.js') }}"></script>
+{% endblock %}

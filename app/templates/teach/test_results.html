@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Results · {{ test.title }}{% endblock %}
+{% block page_title %}{{ test.title }}{% endblock %}
+{% block page_subtitle %}<a href="/teach/courses/{{ course.id }}" style="color:var(--accent)">{{ course.title }}</a> · results{% endblock %}
+
+{% block content %}
+
+<div class="stat-row">
+    <div class="stat">
+        <div class="stat-icon"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-inbox"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ summary.attempts }}</span><span class="stat-label">Submissions</span></div>
+    </div>
+    <div class="stat">
+        <div class="stat-icon purple"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ summary.average }}%</span><span class="stat-label">Class average</span></div>
+    </div>
+    <div class="stat">
+        <div class="stat-icon success"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check-circle"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ summary.pass_rate }}%</span><span class="stat-label">Pass rate ({{ summary.passed }} passed)</span></div>
+    </div>
+    <div class="stat">
+        <div class="stat-icon amber"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-award"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ summary.best }}%</span><span class="stat-label">Top score</span></div>
+    </div>
+</div>
+
+<div class="split">
+    <div>
+        <div class="section-head">
+            <span class="section-title">Every submission</span>
+            <span class="section-sub">Highest first</span>
+        </div>
+
+        {% if attempts %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr><th>Student</th><th class="num">Marks</th><th class="num">Score</th><th>Result</th><th>Submitted</th></tr>
+                </thead>
+                <tbody>
+                    {% for attempt in attempts %}
+                    <tr>
+                        <td>
+                            <div class="row" style="gap:9px">
+                                <div class="avatar" style="width:28px;height:28px;font-size:11px">{{ attempt.student.initial }}</div>
+                                <div class="stack">
+                                    <span class="strong">{{ attempt.student.display_name }}</span>
+                                    <span class="tiny faint">{{ attempt.student.username }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="num nums">{{ attempt.score }} / {{ attempt.max_score }}</td>
+                        <td class="num">
+                            <div class="row" style="gap:8px;justify-content:flex-end">
+                                <div class="progress" style="width:60px"><div class="progress-bar {{ 'success' if attempt.passed else 'error' }}" style="width: {{ attempt.percent }}%"></div></div>
+                                <span class="strong nums">{{ attempt.percent }}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge {{ 'badge-success' if attempt.passed else 'badge-error' }}">
+                                {{ 'Passed' if attempt.passed else 'Failed' }}
+                            </span>
+                            {% if attempt.status.value == 'expired' %}<span class="badge badge-warn">timed out</span>{% endif %}
+                        </td>
+                        <td class="small muted">{{ attempt.submitted_at.strftime('%d %b, %H:%M') if attempt.submitted_at else '--' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="card empty">
+            <div class="empty-icon">
+                <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-inbox"/></svg>
+            </div>
+            <div class="empty-title">No submissions yet</div>
+            <p class="empty-desc">
+                {% if not test.is_published %}This test is still a draft — publish it so students can take it.
+                {% else %}Students haven't sat this test yet.{% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ---------- Question difficulty ---------- #}
+    <div class="rail">
+        <div class="card card-flush">
+            <div class="card-head">
+                <div class="stack">
+                    <span class="section-title">Hardest questions</span>
+                    <span class="section-sub">Lowest success rate first</span>
+                </div>
+            </div>
+            {% if summary.attempts %}
+            <div>
+                {% for row in difficulty %}
+                <div class="note-item">
+                    <span class="lecture-index">{{ row.number }}</span>
+                    <div class="stack" style="flex:1;min-width:0">
+                        <span class="lecture-title truncate">{{ row.question.text }}</span>
+                        <div class="row" style="gap:8px;margin-top:4px">
+                            <div class="progress" style="flex:1">
+                                <div class="progress-bar {{ 'success' if row.percent >= 70 else ('warn' if row.percent >= 40 else 'error') }}"
+                                     style="width: {{ row.percent }}%"></div>
+                            </div>
+                            <span class="tiny strong nums">{{ row.percent }}%</span>
+                        </div>
+                        <span class="tiny faint">{{ row.correct }} of {{ row.attempts }} got it right</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" style="padding:26px 20px">
+                <div class="empty-desc">Difficulty appears once students have submitted.</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <a href="/teach/tests/{{ test.id }}/edit" class="btn btn-outline btn-block">
+            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg>
+            Open the builder
+        </a>
+    </div>
+</div>
+
+{% endblock %}

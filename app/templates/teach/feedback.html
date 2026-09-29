@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Feedback · {{ app_name }}{% endblock %}
+{% block page_title %}Feedback{% endblock %}
+{% block page_subtitle %}What students said about your subjects{% endblock %}
+
+{% block content %}
+
+<div class="grid grid-4 mb">
+    <div class="stat">
+        <span class="stat-label">Overall rating</span>
+        <span class="stat-value nums">{{ overall or '—' }}</span>
+        <span class="stat-sub">across every subject</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Reviews</span>
+        <span class="stat-value nums">{{ total }}</span>
+        <span class="stat-sub">visible to students</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Hidden</span>
+        <span class="stat-value nums">{{ hidden }}</span>
+        <span class="stat-sub">not counted in averages</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Subjects</span>
+        <span class="stat-value nums">{{ rows|length }}</span>
+        <span class="stat-sub">you teach</span>
+    </div>
+</div>
+
+{# ---------------------------- Per subject -------------------------------- #}
+<div class="card mb">
+    <span class="section-title">By subject</span>
+    <div class="stack mt" style="gap:8px">
+        {% for row in rows %}
+        <div class="cal-summary">
+            <span class="cal-stripe accent-{{ row.course.accent }}"></span>
+            <div class="stack" style="gap:2px;flex:1;min-width:0">
+                <a href="/courses/{{ row.course.slug }}#feedback" class="strong small ellipsis">{{ row.course.title }}</a>
+                <span class="tiny muted">
+                    {% if row.rating.count %}
+                        {{ row.rating.count }} review{{ '' if row.rating.count == 1 else 's' }}
+                    {% else %}
+                        No reviews yet
+                    {% endif %}
+                </span>
+            </div>
+            {% if row.rating.count %}
+            <span class="stars small">{{ '★' * (row.rating.average | round | int) }}{{ '☆' * (5 - (row.rating.average | round | int)) }}</span>
+            <span class="badge badge-muted nums">{{ row.rating.average }}</span>
+            {% else %}
+            <span class="tiny muted">—</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="small muted">You do not teach any subjects yet.</p>
+        {% endfor %}
+    </div>
+</div>
+
+{# ------------------------------ Every review ----------------------------- #}
+<div class="section-head">
+    <div class="stack">
+        <span class="section-title">All feedback</span>
+        <span class="section-sub">Newest first. Hiding a review removes it from the average; it never changes the text.</span>
+    </div>
+</div>
+
+{% if reviews %}
+<div class="stack" style="gap:10px">
+    {% for review in reviews %}
+    <div class="card review {{ 'is-hidden' if not review.is_published }}" data-row>
+        <div class="row-between wrap" style="gap:8px">
+            <div class="row" style="gap:9px">
+                <div class="avatar" style="width:30px;height:30px;font-size:11px">{{ review.student.initial }}</div>
+                <div class="stack" style="gap:1px;min-width:0">
+                    <span class="small strong ellipsis">{{ review.student.display_name }}</span>
+                    <a href="/courses/{{ review.course.slug }}#feedback" class="tiny muted ellipsis">
+                        {{ review.course.title }}
+                    </a>
+                </div>
+            </div>
+            <div class="row" style="gap:10px">
+                <span class="stars">{{ review.stars }}</span>
+                <span class="tiny muted">{{ review.updated_at.strftime('%d %b %Y') if review.updated_at }}</span>
+                <button class="btn btn-ghost btn-sm"
+                        onclick="moderateReview(this, {{ review.id }}, {{ 'false' if review.is_published else 'true' }})">
+                    {{ 'Hide' if review.is_published else 'Restore' }}
+                </button>
+            </div>
+        </div>
+        {% if review.comment %}
+        <p class="small" style="margin-top:8px">{{ review.comment }}</p>
+        {% endif %}
+        {% if not review.is_published %}
+        <span class="tiny" style="color:var(--warn)">Hidden from students and excluded from the average.</span>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-star"/></svg>
+    </div>
+    <div class="empty-title">No feedback yet</div>
+    <p class="empty-desc">
+        Reviews appear here once students who are enrolled in your subjects rate them.
+    </p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function moderateReview(button, reviewId, publish) {
+  setLoading(button, true);
+  try {
+    const res = await api(`/teach/api/reviews/${reviewId}/moderate`, {
+      method: 'POST',
+      body: { is_published: publish },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+</script>
+{% endblock %}

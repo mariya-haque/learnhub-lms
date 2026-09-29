@@ -1,0 +1,40 @@
+# --- Secrets ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+build/
+dist/
+
+# --- Database --------------------------------------------------------------
+*.db
+*.sqlite3
+*.db-journal
+
+# --- Uploaded course content -----------------------------------------------
+# Keep the folders, never the media.
+uploads/videos/*
+uploads/notes/*
+!uploads/videos/.gitkeep
+!uploads/notes/.gitkeep
+
+# --- Logs ------------------------------------------------------------------
+*.log
+logs/
+
+# --- Node (not used, but harmless) ------------------------------------------
+node_modules/
+
+# --- Editors / OS ----------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

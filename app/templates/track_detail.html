@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}{{ track.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ track.title }}{% endblock %}
+{% block page_subtitle %}{{ stats.subjects }} subjects · {{ stats.chapters }} chapters · {{ stats.lectures }} videos · {{ stats.tests }} tests{% endblock %}
+
+{% block content %}
+
+<div class="card mb">
+    <div class="row-between wrap" style="gap:14px">
+        <div class="row" style="gap:14px;flex:1;min-width:240px">
+            <div class="track-badge {{ track.accent }}">{{ track.label }}</div>
+            <div class="stack" style="gap:4px;flex:1">
+                <div class="row" style="gap:8px">
+                    <span class="strong" style="font-size:15px">{{ track.title }}</span>
+                    {% if not track.is_published %}<span class="badge badge-warn">Draft</span>{% endif %}
+                    {% if joined %}<span class="badge badge-success">Joined</span>{% endif %}
+                </div>
+                <p class="small muted">{{ track.description or 'No description yet.' }}</p>
+                <span class="tiny muted">{{ stats.students }} student{{ '' if stats.students == 1 else 's' }} enrolled</span>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            {% if can_manage %}
+                <a href="/teach/tracks/{{ track.id }}" class="btn">
+                    <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg>
+                    Manage track
+                </a>
+            {% elif joined and entitled %}
+                <button class="btn btn-outline" onclick="leaveTrack(this, {{ track.id }})">Leave track</button>
+            {% elif entitled and not current_user.is_teacher %}
+                <button class="btn" onclick="joinTrack(this, {{ track.id }})">
+                    Join track — unlock {{ stats.subjects }} subject{{ '' if stats.subjects == 1 else 's' }}
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ------------------------------- Paywall ---------------------------------- #}
+{% if track.requires_subscription and not entitled and not current_user.is_teacher %}
+<div class="card mb">
+    <div class="row" style="gap:10px;margin-bottom:6px">
+        <svg width="18" height="18" class="icon" style="color:var(--accent)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg>
+        <span class="section-title">This track needs a subscription</span>
+    </div>
+
+    {% if pending %}
+    <div class="alert alert-info mt">
+        <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+        <span>
+            Your request for <strong>{{ pending.plan_name }}</strong> is waiting for
+            confirmation. Access opens once an administrator records your payment.
+        </span>
+    </div>
+    {% elif plans %}
+    <p class="small muted mb">
+        Pick a plan and send a request. Payment is arranged with your institute —
+        access opens as soon as it is confirmed.
+    </p>
+    <div class="grid grid-3">
+        {% for plan in plans %}
+        <div class="plan-card">
+            <span class="plan-name">{{ plan.name }}</span>
+            <span class="plan-price">{{ plan.price_minor | money(plan.currency) }}</span>
+            <span class="tiny muted">for {{ plan.duration_days }} days</span>
+            {% if plan.description %}
+            <p class="tiny muted" style="margin-top:6px">{{ plan.description }}</p>
+            {% endif %}
+            <button class="btn btn-sm mt" style="width:100%"
+                    onclick="requestPlan(this, {{ plan.id }})">Request</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="small muted">
+        No plans are on sale yet. Ask your institute how to get access.
+    </p>
+    {% endif %}
+</div>
+
+<div class="alert alert-warn mb">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye-off"/></svg>
+    <span>The syllabus below is a preview — lessons and tests stay locked until your subscription is active.</span>
+</div>
+
+{% elif subscription %}
+<div class="alert alert-info mb">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check-circle"/></svg>
+    <span>
+        Subscription active{% if subscription.expires_at_utc %} —
+        {{ subscription.days_left }} day{{ '' if subscription.days_left == 1 else 's' }} left,
+        ending {{ subscription.expires_at_utc.strftime('%d %b %Y') }}{% endif %}.
+        <a href="/subscriptions" style="color:inherit;text-decoration:underline">Manage</a>
+    </span>
+</div>
+{% endif %}
+
+{% if not joined and not can_manage and not current_user.is_teacher and entitled %}
+<div class="alert alert-info mb">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-info"/></svg>
+    <span>Join this track once and every subject below opens — including any added later.</span>
+</div>
+{% endif %}
+
+{% if rows %}
+    {% for row in rows %}
+    <div class="card mb">
+        <div class="row-between wrap mb" style="gap:10px">
+            <div class="row" style="gap:10px">
+                <div class="subject-dot {{ row.subject.accent }}"></div>
+                <div class="stack" style="gap:2px">
+                    <a href="/courses/{{ row.subject.slug }}" class="strong" style="font-size:14.5px">{{ row.subject.title }}</a>
+                    <span class="tiny muted">
+                        {{ row.stats.lectures }} videos · {{ row.stats.tests }} tests ·
+                        taught by {{ row.subject.teacher.display_name }}
+                    </span>
+                </div>
+            </div>
+            <div class="row" style="gap:8px">
+                {% if row.rating.count %}
+                <span class="tiny muted" title="{{ row.rating.count }} review{{ '' if row.rating.count == 1 else 's' }}">
+                    <span class="stars">★</span>
+                    <span class="nums">{{ row.rating.average }}</span>
+                    ({{ row.rating.count }})
+                </span>
+                {% endif %}
+                {% if row.progress %}
+                <span class="badge badge-muted">{{ row.progress.percent }}% done</span>
+                {% endif %}
+                <a href="/courses/{{ row.subject.slug }}"
+                   class="btn btn-sm {{ '' if row.can_open else 'btn-outline' }}">
+                    {{ 'Open subject' if row.can_open else 'Preview' }}
+                </a>
+            </div>
+        </div>
+
+        {% if row.outline %}
+        <div class="chapter-list">
+            {% for group in row.outline %}
+            <details class="chapter" {% if loop.first and row.can_open %}open{% endif %}>
+                <summary class="chapter-head">
+                    <svg width="14" height="14" class="icon chapter-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+                    <span class="chapter-title">
+                        {{ group.chapter.title if group.chapter else 'Unfiled' }}
+                    </span>
+                    {% if group.chapter and not group.chapter.is_published %}
+                    <span class="badge badge-warn">Draft</span>
+                    {% endif %}
+                    <span class="chapter-count">{{ group.count }} item{{ '' if group.count == 1 else 's' }}</span>
+                </summary>
+
+                <div class="chapter-body">
+                    {% if group.chapter and group.chapter.description %}
+                    <p class="tiny muted mb">{{ group.chapter.description }}</p>
+                    {% endif %}
+
+                    {% for lecture in group.lectures %}
+                    <a class="content-row" href="{{ '/learn/' ~ lecture.id if row.can_open else '/courses/' ~ row.subject.slug }}">
+                        <span class="content-icon video">
+                            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+                        </span>
+                        <span class="ellipsis" style="flex:1">{{ lecture.title }}</span>
+                        {% if lecture.duration_seconds %}
+                        <span class="tiny muted">{{ lecture.duration_seconds|duration }}</span>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+
+                    {% for test in group.practice %}
+                    <a class="content-row" href="{{ '/tests/' ~ test.id ~ '/start' if row.can_open else '/courses/' ~ row.subject.slug }}">
+                        <span class="content-icon practice">
+                            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                        </span>
+                        <span class="ellipsis" style="flex:1">{{ test.title }}</span>
+                        <span class="badge badge-practice">Practice</span>
+                    </a>
+                    {% endfor %}
+
+                    {% for test in group.grand %}
+                    <a class="content-row" href="{{ '/tests/' ~ test.id ~ '/start' if row.can_open else '/courses/' ~ row.subject.slug }}">
+                        <span class="content-icon grand">
+                            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-timer"/></svg>
+                        </span>
+                        <span class="ellipsis" style="flex:1">{{ test.title }}</span>
+                        <span class="badge badge-grand">
+                            Grand{% if test.duration_minutes %} · {{ test.duration_minutes }}m{% endif %}
+                        </span>
+                    </a>
+                    {% endfor %}
+
+                    {% for note in group.notes %}
+                    <a class="content-row" href="{{ '/files/note/' ~ note.id if row.can_open else '/courses/' ~ row.subject.slug }}">
+                        <span class="content-icon note">
+                            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file"/></svg>
+                        </span>
+                        <span class="ellipsis" style="flex:1">{{ note.title }}</span>
+                        <span class="tiny muted">{{ note.extension }}</span>
+                    </a>
+                    {% endfor %}
+
+                    {% if group.count == 0 %}
+                    <p class="tiny muted">Nothing in this chapter yet.</p>
+                    {% endif %}
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="small muted">No chapters yet in this subject.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-book"/></svg>
+    </div>
+    <div class="empty-title">No subjects yet</div>
+    <p class="empty-desc">
+        {% if can_manage %}
+            Add subjects to this track from the manage page, then break each one
+            into chapters of videos, notes and tests.
+        {% else %}
+            This track has no published subjects yet. Check back soon.
+        {% endif %}
+    </p>
+    {% if can_manage %}
+    <a href="/teach/tracks/{{ track.id }}" class="btn mt">Manage track</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function joinTrack(button, trackId) {
+  setLoading(button, true);
+  try {
+    const res = await api(`/tracks/${trackId}/join`, { method: 'POST' });
+    showToast(res.message || 'Joined.', 'success');
+    setTimeout(() => window.location.reload(), 600);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+async function requestPlan(button, planId) {
+  setLoading(button, true);
+  try {
+    const res = await api('/subscriptions/request', {
+      method: 'POST',
+      body: { plan_id: planId },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+async function leaveTrack(button, trackId) {
+  const ok = await confirmAction({
+    title: 'Leave this track?',
+    message: 'Its subjects will lock again. Anything you enrolled in separately stays.',
+    confirmLabel: 'Leave',
+  });
+  if (!ok) return;
+  setLoading(button, true);
+  try {
+    await api(`/tracks/${trackId}/leave`, { method: 'POST' });
+    showToast('Left the track.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+</script>
+{% endblock %}

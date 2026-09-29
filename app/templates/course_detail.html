@@ -1,0 +1,553 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ course.title }}{% endblock %}
+{% block page_subtitle %}{{ course.subject or 'Course' }} · taught by {{ course.teacher.display_name }}{% endblock %}
+
+{% block content %}
+
+{% if not course.is_published %}
+<div class="alert alert-warn">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye-off"/></svg>
+    <span>This course is a draft. Only you can see it until you publish it.</span>
+</div>
+{% endif %}
+
+{% if track %}
+<div class="row wrap mb" style="gap:8px;align-items:center">
+    <a href="/tracks/{{ track.slug }}" class="badge badge-muted">
+        <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg>
+        {{ track.title }}
+    </a>
+    <span class="tiny muted">›</span>
+    <span class="tiny muted">{{ course.title }}</span>
+    {% if via_track %}
+    <span class="badge badge-success">Unlocked by your track</span>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ---------- Syllabus ---------- #}
+{% set chaptered = outline | selectattr('chapter') | list %}
+{% if chaptered %}
+<div class="card mb">
+    <div class="row-between mb">
+        <span class="section-title">Syllabus</span>
+        <span class="tiny muted">{{ chaptered|length }} chapter{{ '' if chaptered|length == 1 else 's' }}</span>
+    </div>
+    <div class="chapter-list">
+        {% for group in outline %}
+        <details class="chapter" {% if loop.first %}open{% endif %}>
+            <summary class="chapter-head">
+                <svg width="14" height="14" class="icon chapter-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+                <span class="chapter-title">{{ group.chapter.title if group.chapter else 'Unfiled' }}</span>
+                {% if group.chapter and not group.chapter.is_published %}
+                <span class="badge badge-warn">Draft</span>
+                {% endif %}
+                <span class="chapter-count">{{ group.count }} item{{ '' if group.count == 1 else 's' }}</span>
+            </summary>
+            <div class="chapter-body">
+                {% if group.chapter and group.chapter.description %}
+                <p class="tiny muted mb">{{ group.chapter.description }}</p>
+                {% endif %}
+
+                {% for lecture in group.lectures %}
+                <a class="content-row" href="{{ '/learn/' ~ lecture.id if has_access else '#' }}">
+                    <span class="content-icon video">
+                        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+                    </span>
+                    <span class="ellipsis" style="flex:1">{{ lecture.title }}</span>
+                    {% if progress.get(lecture.id) and progress[lecture.id].completed %}
+                    <svg width="14" height="14" class="icon" style="color:var(--success)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check-circle"/></svg>
+                    {% endif %}
+                </a>
+                {% endfor %}
+
+                {% for test in group.practice %}
+                <a class="content-row" href="{{ '/tests/' ~ test.id ~ '/start' if has_access else '#' }}">
+                    <span class="content-icon practice">
+                        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                    </span>
+                    <span class="ellipsis" style="flex:1">{{ test.title }}</span>
+                    <span class="badge badge-practice">Practice</span>
+                </a>
+                {% endfor %}
+
+                {% for test in group.grand %}
+                <a class="content-row" href="{{ '/tests/' ~ test.id ~ '/start' if has_access else '#' }}">
+                    <span class="content-icon grand">
+                        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-timer"/></svg>
+                    </span>
+                    <span class="ellipsis" style="flex:1">{{ test.title }}</span>
+                    <span class="badge badge-grand">
+                        Grand{% if test.duration_minutes %} · {{ test.duration_minutes }}m{% endif %}
+                    </span>
+                </a>
+                {% endfor %}
+
+                {% for note in group.notes %}
+                <a class="content-row" href="{{ '/files/note/' ~ note.id if has_access else '#' }}">
+                    <span class="content-icon note">
+                        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file"/></svg>
+                    </span>
+                    <span class="ellipsis" style="flex:1">{{ note.title }}</span>
+                    <span class="tiny muted">{{ note.extension }}</span>
+                </a>
+                {% endfor %}
+
+                {% if group.count == 0 %}
+                <p class="tiny muted">Nothing in this chapter yet.</p>
+                {% endif %}
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="split">
+    <div class="stack" style="gap:22px">
+
+        {# ---------- Lectures ---------- #}
+        <div>
+            <div class="section-head">
+                <div class="stack">
+                    <span class="section-title">Lectures</span>
+                    <span class="section-sub">{{ lectures|length }} in this course</span>
+                </div>
+                {% if has_access and resume %}
+                <a href="/learn/{{ resume.id }}" class="btn btn-sm">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play"/></svg>
+                    {{ 'Continue' if summary and summary.completed else 'Start course' }}
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="card card-flush">
+                {% if lectures %}
+                <div class="lecture-list">
+                    {% for lecture in lectures %}
+                    {% set done = progress.get(lecture.id) and progress[lecture.id].completed %}
+                    <div class="lecture-item {{ 'done' if done }} {{ 'locked' if not has_access }}">
+                        <div class="lecture-index">
+                            {% if done %}
+                            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                            {% else %}{{ loop.index }}{% endif %}
+                        </div>
+                        <div class="stack" style="flex:1;min-width:0">
+                            <span class="lecture-title">{{ lecture.title }}</span>
+                            <span class="lecture-sub">
+                                {% if lecture.description %}{{ lecture.description }}{% else %}
+                                    {{ 'Uploaded video' if lecture.source_type.value == 'upload' else 'External video' }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="lecture-actions">
+                            {% if lecture.duration_seconds %}
+                            <span class="tiny faint nums">{{ lecture.duration_seconds|duration }}</span>
+                            {% endif %}
+                            {% if not lecture.is_published %}<span class="badge badge-muted">Draft</span>{% endif %}
+                            {% if has_access %}
+                            <a href="/learn/{{ lecture.id }}" class="btn btn-sm btn-outline">
+                                <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play"/></svg>
+                                {{ 'Rewatch' if done else 'Watch' }}
+                            </a>
+                            {% else %}
+                            <svg width="15" height="15" class="icon faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty">
+                    <div class="empty-icon">
+                        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+                    </div>
+                    <div class="empty-title">No lectures yet</div>
+                    <p class="empty-desc">The teacher hasn't published any lectures for this course.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ---------- Tests ---------- #}
+        <div>
+            <div class="section-head">
+                <div class="stack">
+                    <span class="section-title">Tests</span>
+                    <span class="section-sub">Practice as often as you like; grand tests are timed</span>
+                </div>
+            </div>
+
+            {% if test_rows %}
+            <div class="grid grid-2">
+                {% for row in test_rows %}
+                <div class="card">
+                    <div class="row-between mb">
+                        <span class="badge badge-{{ row.test.kind.value }}">
+                            <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-{{ 'timer' if row.test.kind.value == 'grand' else 'clipboard' }}"/></svg>
+                            {{ row.test.kind.value|title }}
+                        </span>
+                        {% if not row.test.is_published %}<span class="badge badge-muted">Draft</span>{% endif %}
+                    </div>
+                    <div class="stack">
+                        <span class="strong">{{ row.test.title }}</span>
+                        <span class="small muted">{{ row.test.description or 'No description.' }}</span>
+                    </div>
+
+                    <div class="row wrap small muted" style="gap:14px;margin-top:12px">
+                        <span class="row" style="gap:5px">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                            {{ row.test.question_count }} questions
+                        </span>
+                        <span class="row" style="gap:5px">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-target"/></svg>
+                            {{ row.test.total_marks }} marks
+                        </span>
+                        {% if row.test.duration_minutes %}
+                        <span class="row" style="gap:5px">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+                            {{ row.test.duration_minutes }} min
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {% if row.best %}
+                    <div class="row-between mt" style="padding-top:12px;border-top:1px solid var(--border-light)">
+                        <span class="small muted">Best score</span>
+                        <span class="badge {{ 'badge-success' if row.best.passed else 'badge-error' }}">{{ row.best.percent }}%</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="btn-group mt">
+                        {% if not has_access %}
+                            <button class="btn btn-outline btn-sm" disabled>Enroll to take this</button>
+                        {% elif row.open %}
+                            <a href="/attempts/{{ row.open.id }}" class="btn btn-sm">Resume attempt</a>
+                        {% elif row.test.max_attempts and row.attempts_used >= row.test.max_attempts %}
+                            <button class="btn btn-outline btn-sm" disabled>No attempts left</button>
+                            {% if row.best %}<a href="/attempts/{{ row.best.id }}/result" class="btn btn-ghost btn-sm">Review</a>{% endif %}
+                        {% elif row.test.question_count == 0 %}
+                            <button class="btn btn-outline btn-sm" disabled>No questions yet</button>
+                        {% else %}
+                            <a href="/tests/{{ row.test.id }}/start" class="btn btn-sm">
+                                {{ 'Retake' if row.attempts_used else 'Start' }}
+                            </a>
+                            {% if row.best %}<a href="/attempts/{{ row.best.id }}/result" class="btn btn-ghost btn-sm">Last result</a>{% endif %}
+                        {% endif %}
+                    </div>
+
+                    {% if row.test.max_attempts %}
+                    <p class="tiny faint" style="margin-top:8px">
+                        Attempt {{ row.attempts_used }} of {{ row.test.max_attempts }}
+                        {%- if row.test.negative_marking %} · negative marking on{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card empty">
+                <div class="empty-icon">
+                    <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                </div>
+                <div class="empty-title">No tests yet</div>
+                <p class="empty-desc">Practice and grand tests will show up here once the teacher publishes them.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---------- Right rail ---------- #}
+    <div class="rail">
+        <div class="card">
+            {% if enrolled and summary %}
+            <div class="row mb" style="gap:14px">
+                <div class="ring" style="--pct: {{ summary.percent }}"><span>{{ summary.percent }}%</span></div>
+                <div class="stack">
+                    <span class="strong">Your progress</span>
+                    <span class="small muted">{{ summary.completed }} of {{ summary.total }} lectures done</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <p class="small muted">{{ course.description or 'No description provided.' }}</p>
+
+            <div class="switch-row mt">
+                <span class="small muted">Lectures</span><span class="strong nums">{{ stats.lectures }}</span>
+            </div>
+            <div class="switch-row">
+                <span class="small muted">Tests</span><span class="strong nums">{{ stats.tests }}</span>
+            </div>
+            <div class="switch-row">
+                <span class="small muted">Students</span><span class="strong nums">{{ stats.students }}</span>
+            </div>
+
+            {% if can_manage %}
+            <a href="/teach/courses/{{ course.id }}" class="btn btn-block mt">
+                <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg>
+                Manage this course
+            </a>
+            {% elif enrolled %}
+            <button class="btn btn-outline btn-block mt" onclick="leaveCourse({{ course.id }})">Leave course</button>
+            {% else %}
+            <button class="btn btn-block mt" id="enroll-btn" onclick="joinCourse(this, {{ course.id }})">
+                <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+                Enroll in this course
+            </button>
+            {% endif %}
+        </div>
+
+        {# ---------- Notes ---------- #}
+        <div class="card card-flush">
+            <div class="card-head">
+                <span class="section-title">Notes &amp; handouts</span>
+                <span class="badge badge-muted">{{ notes|length }}</span>
+            </div>
+            {% if notes %}
+                {% if has_access %}
+                <div>
+                    {% for note in notes %}
+                    <a href="/files/note/{{ note.id }}" class="note-item">
+                        <span class="file-chip">{{ note.extension[:4] }}</span>
+                        <div class="stack" style="flex:1;min-width:0">
+                            <span class="lecture-title truncate">{{ note.title }}</span>
+                            <span class="lecture-sub">{{ note.file_size|filesize }}{% if note.lecture %} · {{ note.lecture.title }}{% endif %}</span>
+                        </div>
+                        <svg width="16" height="16" class="icon faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty" style="padding:26px 20px">
+                    <svg width="20" height="20" class="icon faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg>
+                    <div class="empty-desc">{{ notes|length }} file{{ '' if notes|length == 1 else 's' }} — enroll to download.</div>
+                </div>
+                {% endif %}
+            {% else %}
+            <div class="empty" style="padding:26px 20px">
+                <div class="empty-desc">No notes uploaded yet.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ------------------------------- Feedback -------------------------------- #}
+<div class="card mt" id="feedback">
+    <div class="row-between wrap mb" style="gap:12px">
+        <div class="stack">
+            <span class="section-title">Student feedback</span>
+            <span class="section-sub">
+                {% if rating.count %}
+                    {{ rating.count }} review{{ '' if rating.count == 1 else 's' }} from students who took this subject
+                {% else %}
+                    No reviews yet
+                {% endif %}
+            </span>
+        </div>
+        {% if rating.count %}
+        <div class="rating-summary">
+            <span class="rating-score nums">{{ rating.average }}</span>
+            <div class="stack" style="gap:1px">
+                <span class="stars">{{ '★' * (rating.average | round | int) }}{{ '☆' * (5 - (rating.average | round | int)) }}</span>
+                <span class="tiny muted">out of 5</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if rating.count %}
+    <div class="rating-bars mb">
+        {% for star in [5, 4, 3, 2, 1] %}
+        <div class="rating-bar-row">
+            <span class="tiny muted" style="width:26px">{{ star }}★</span>
+            <div class="rating-bar">
+                <span style="width: {{ (rating.distribution[star] / rating.count * 100) | round | int }}%"></span>
+            </div>
+            <span class="tiny muted nums" style="width:24px;text-align:right">{{ rating.distribution[star] }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ---- Write / edit your own ---- #}
+    {% if can_review %}
+    <div class="review-form mb">
+        <div class="row-between wrap mb" style="gap:8px">
+            <span class="strong small">{{ 'Your review' if my_review else 'Rate this subject' }}</span>
+            {% if my_review %}
+            <button class="btn btn-ghost btn-sm" onclick="deleteReview({{ course.id }})">Remove</button>
+            {% endif %}
+        </div>
+        <div class="star-input" id="star-input" role="radiogroup" aria-label="Rating">
+            {% for star in [1, 2, 3, 4, 5] %}
+            <button type="button" class="star-btn {{ 'on' if my_review and my_review.rating >= star }}"
+                    data-star="{{ star }}" aria-label="{{ star }} star{{ '' if star == 1 else 's' }}">★</button>
+            {% endfor %}
+            <span class="tiny muted" id="star-hint">
+                {{ my_review.rating ~ ' / 5' if my_review else 'Pick a rating' }}
+            </span>
+        </div>
+        <textarea class="input mt" id="review-comment" rows="3" maxlength="1500"
+                  placeholder="What worked, and what would you change? (optional)">{{ my_review.comment or '' if my_review else '' }}</textarea>
+        <div class="row mt" style="gap:8px">
+            <button class="btn btn-sm" id="review-save" onclick="saveReview({{ course.id }})">
+                {{ 'Update review' if my_review else 'Post review' }}
+            </button>
+            {% if my_review and not my_review.is_published %}
+            <span class="badge badge-warn">Hidden by the teacher</span>
+            {% endif %}
+        </div>
+    </div>
+    {% elif not has_access and not can_manage %}
+    <p class="small muted mb">Enroll in this subject to leave feedback.</p>
+    {% endif %}
+
+    {# ---- Everyone else's ---- #}
+    {% if reviews %}
+    <div class="stack" style="gap:10px">
+        {% for review in reviews %}
+        <div class="review {{ 'is-hidden' if not review.is_published }}" data-row>
+            <div class="row-between wrap" style="gap:8px">
+                <div class="row" style="gap:9px">
+                    <div class="avatar" style="width:28px;height:28px;font-size:11px">{{ review.student.initial }}</div>
+                    <div class="stack" style="gap:1px">
+                        <span class="small strong">{{ review.student.display_name }}</span>
+                        <span class="stars small">{{ review.stars }}</span>
+                    </div>
+                </div>
+                <div class="row" style="gap:8px">
+                    <span class="tiny muted">{{ review.updated_at.strftime('%d %b %Y') if review.updated_at }}</span>
+                    {% if can_manage %}
+                    <button class="btn btn-ghost btn-sm"
+                            onclick="moderateReview(this, {{ review.id }}, {{ 'false' if review.is_published else 'true' }})">
+                        {{ 'Hide' if review.is_published else 'Restore' }}
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% if review.comment %}
+            <p class="small" style="margin-top:8px">{{ review.comment }}</p>
+            {% endif %}
+            {% if not review.is_published %}
+            <span class="tiny" style="color:var(--warn)">Hidden — students cannot see this, and it does not count towards the average.</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% elif not can_review %}
+    <p class="small muted">Nobody has reviewed this subject yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function joinCourse(button, courseId) {
+  setLoading(button, true);
+  try {
+    await api(`/courses/${courseId}/enroll`, { method: 'POST' });
+    showToast('You are enrolled.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+/* --------------------------------- Reviews -------------------------------- */
+
+let chosenRating = {{ my_review.rating if my_review else 0 }};
+
+document.querySelectorAll('.star-btn').forEach((button) => {
+  const value = Number(button.dataset.star);
+  // Hover previews the score; leaving the row snaps back to what is chosen, so
+  // the widget never lies about what will be submitted.
+  button.addEventListener('mouseenter', () => paintStars(value));
+  button.addEventListener('focus', () => paintStars(value));
+  button.addEventListener('click', () => { chosenRating = value; paintStars(value); });
+});
+
+const starInput = document.getElementById('star-input');
+if (starInput) starInput.addEventListener('mouseleave', () => paintStars(chosenRating));
+
+function paintStars(upTo) {
+  document.querySelectorAll('.star-btn').forEach((button) => {
+    button.classList.toggle('on', Number(button.dataset.star) <= upTo);
+  });
+  const hint = document.getElementById('star-hint');
+  if (hint) hint.textContent = upTo ? `${upTo} / 5` : 'Pick a rating';
+}
+
+async function saveReview(courseId) {
+  if (!chosenRating) {
+    showToast('Pick a star rating first.', 'error');
+    return;
+  }
+  const button = document.getElementById('review-save');
+  setLoading(button, true);
+  try {
+    const res = await api(`/courses/${courseId}/review`, {
+      method: 'PUT',
+      body: {
+        rating: chosenRating,
+        comment: document.getElementById('review-comment').value.trim() || null,
+      },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+async function deleteReview(courseId) {
+  const ok = await confirmAction({
+    title: 'Remove your review?',
+    message: 'Your rating stops counting towards this subject’s average.',
+    confirmLabel: 'Remove',
+  });
+  if (!ok) return;
+  try {
+    await api(`/courses/${courseId}/review`, { method: 'DELETE' });
+    showToast('Review removed.', 'info');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function moderateReview(button, reviewId, publish) {
+  setLoading(button, true);
+  try {
+    const res = await api(`/teach/api/reviews/${reviewId}/moderate`, {
+      method: 'POST',
+      body: { is_published: publish },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+async function leaveCourse(courseId) {
+  const ok = await confirmAction({
+    title: 'Leave this course?',
+    message: 'Your watch progress and test results are kept, but the course will drop off your dashboard.',
+    confirmLabel: 'Leave',
+  });
+  if (!ok) return;
+  try {
+    await api(`/courses/${courseId}/unenroll`, { method: 'POST' });
+    showToast('You have left the course.', 'info');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+</script>
+{% endblock %}

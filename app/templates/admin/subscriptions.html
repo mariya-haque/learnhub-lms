@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Subscriptions · {{ app_name }}{% endblock %}
+{% block page_title %}Subscriptions{% endblock %}
+{% block page_subtitle %}Record payments taken outside the app, and manage access{% endblock %}
+
+{% block content %}
+
+<div class="grid grid-4 mb">
+    <div class="stat">
+        <span class="stat-label">Awaiting confirmation</span>
+        <span class="stat-value nums">{{ summary.pending }}</span>
+        <span class="stat-sub">requests to review</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Active now</span>
+        <span class="stat-value nums">{{ summary.active }}</span>
+        <span class="stat-sub">inside their window</span>
+    </div>
+    {% for line in summary.collected %}
+    <div class="stat">
+        <span class="stat-label">Collected ({{ line.currency }})</span>
+        <span class="stat-value nums">{{ line.total }}</span>
+        <span class="stat-sub">confirmed payments only</span>
+    </div>
+    {% else %}
+    <div class="stat">
+        <span class="stat-label">Collected</span>
+        <span class="stat-value nums">—</span>
+        <span class="stat-sub">nothing confirmed yet</span>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row-between wrap mb" style="gap:10px">
+    <form method="get" action="/admin/subscriptions" class="row wrap" style="gap:8px;flex:1">
+        <div class="input-group" style="flex:1;min-width:190px;max-width:320px">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-search"/></svg>
+            <input class="input" type="search" name="q" value="{{ q }}" placeholder="Student or payment reference...">
+        </div>
+        <select class="select" name="status" onchange="this.form.submit()" style="max-width:170px">
+            <option value="">Any status</option>
+            {% for name in ['pending','active','expired','cancelled','rejected'] %}
+            <option value="{{ name }}" {% if status == name %}selected{% endif %}>{{ name|title }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn">Search</button>
+        {% if q or status %}<a href="/admin/subscriptions" class="btn btn-ghost">Clear</a>{% endif %}
+    </form>
+
+    <button class="btn btn-outline" onclick="showModal('grant-modal')">
+        <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sparkle"/></svg>
+        Grant access
+    </button>
+</div>
+
+{% if subscriptions %}
+<div class="table-wrap">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Student</th>
+                <th>Track &amp; plan</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th style="text-align:right">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sub in subscriptions %}
+            <tr data-row>
+                <td>
+                    <div class="stack" style="gap:1px;min-width:0">
+                        <span class="small strong ellipsis">{{ sub.student.display_name }}</span>
+                        <span class="tiny muted">@{{ sub.student.username }}</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="stack" style="gap:1px;min-width:0">
+                        <span class="small ellipsis">{{ sub.track.title if sub.track else '—' }}</span>
+                        <span class="tiny muted">{{ sub.plan_name or 'Custom' }}</span>
+                    </div>
+                </td>
+                <td class="nums small">{{ sub.price_minor | money(sub.currency) }}</td>
+                <td>
+                    {% if sub.is_current %}
+                        <span class="badge badge-success">Active</span>
+                        {% if sub.expires_at_utc %}
+                        <div class="tiny muted" style="margin-top:3px">
+                            {{ sub.days_left }}d left
+                        </div>
+                        {% endif %}
+                    {% elif sub.status.value == 'pending' %}
+                        <span class="badge badge-warn">Pending</span>
+                    {% elif sub.status.value == 'expired' %}
+                        <span class="badge badge-muted">Expired</span>
+                    {% elif sub.status.value == 'cancelled' %}
+                        <span class="badge badge-error">Cancelled</span>
+                    {% else %}
+                        <span class="badge badge-error">Rejected</span>
+                    {% endif %}
+                </td>
+                <td class="tiny muted">
+                    {% if sub.payment_method %}
+                        {{ sub.payment_method }}
+                        {% if sub.payment_reference %}<br><span class="nums">{{ sub.payment_reference }}</span>{% endif %}
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    <div class="row" style="gap:5px;justify-content:flex-end">
+                        {% if sub.status.value == 'pending' %}
+                        <button class="btn btn-sm"
+                                onclick='openApprove({{ {"id": sub.id, "student": sub.student.display_name, "track": sub.track.title if sub.track else "", "plan": sub.plan_name or "", "days": sub.plan.duration_days if sub.plan else 30, "amount": (sub.price_minor / 100)} | tojson }})'>
+                            Confirm payment
+                        </button>
+                        <button class="btn btn-ghost btn-sm"
+                                onclick="rejectSub(this, {{ sub.id }})">Reject</button>
+                        {% elif sub.is_current %}
+                        <button class="btn btn-outline btn-sm"
+                                onclick="extendSub(this, {{ sub.id }})">Extend</button>
+                        <button class="btn btn-ghost btn-sm"
+                                onclick="cancelSub(this, {{ sub.id }})">Cancel</button>
+                        {% else %}
+                        <button class="btn btn-outline btn-sm"
+                                onclick="extendSub(this, {{ sub.id }})">Reactivate</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-card"/></svg>
+    </div>
+    <div class="empty-title">No subscriptions{% if q or status %} match that filter{% endif %}</div>
+    <p class="empty-desc">
+        Requests appear here when a student picks a plan on a paid track. Turn on
+        <em>Require a subscription</em> in a track's settings and add plans to start selling.
+    </p>
+    {% if q or status %}<a href="/admin/subscriptions" class="btn mt">Clear filters</a>{% endif %}
+</div>
+{% endif %}
+
+{# ------------------------------- Approve ---------------------------------- #}
+<div class="modal-overlay" id="approve-modal">
+    <div class="modal" style="max-width:460px">
+        <h3 class="modal-title">Confirm payment</h3>
+        <p class="modal-desc" id="approve-desc"></p>
+        <form id="approve-form" class="stack mt" style="gap:12px">
+            <input type="hidden" id="a-id">
+            <div class="row wrap" style="gap:12px">
+                <div class="field" style="flex:1;min-width:150px">
+                    <label class="label" for="a-method">Paid by</label>
+                    <select class="input" id="a-method">
+                        {% for method in methods %}
+                        <option value="{{ method }}">{{ method }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field" style="flex:1;min-width:130px">
+                    <label class="label" for="a-days">Days of access</label>
+                    <input class="input" id="a-days" type="number" min="1" max="3650" value="30">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="a-ref">Reference <span class="muted">(transaction id, slip no.)</span></label>
+                <input class="input" id="a-ref" placeholder="e.g. JazzCash 48213">
+            </div>
+            <div class="field">
+                <label class="label" for="a-note">Note <span class="muted">(optional)</span></label>
+                <input class="input" id="a-note">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="hideModal('approve-modal')">Cancel</button>
+                <button type="submit" class="btn" id="a-save">Activate</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# -------------------------------- Grant ----------------------------------- #}
+<div class="modal-overlay" id="grant-modal">
+    <div class="modal" style="max-width:460px">
+        <h3 class="modal-title">Grant access</h3>
+        <p class="modal-desc">
+            Free access with no payment recorded — scholarships, trials, or sorting
+            something out by hand. The student is joined to the track automatically.
+        </p>
+        <form id="grant-form" class="stack mt" style="gap:12px">
+            <div class="field">
+                <label class="label" for="g-student">Student</label>
+                <select class="input" id="g-student" required>
+                    {% for student in students %}
+                    <option value="{{ student.id }}">{{ student.display_name }} (@{{ student.username }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="row wrap" style="gap:12px">
+                <div class="field" style="flex:2;min-width:170px">
+                    <label class="label" for="g-track">Track</label>
+                    <select class="input" id="g-track" required>
+                        {% for track in tracks %}
+                        <option value="{{ track.id }}">{{ track.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field" style="flex:1;min-width:120px">
+                    <label class="label" for="g-days">Days</label>
+                    <input class="input" id="g-days" type="number" min="1" max="3650" value="30">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="g-note">Reason <span class="muted">(optional)</span></label>
+                <input class="input" id="g-note" placeholder="Scholarship, free trial…">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="hideModal('grant-modal')">Cancel</button>
+                <button type="submit" class="btn" id="g-save">Grant</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openApprove(sub) {
+  document.getElementById('a-id').value = sub.id;
+  document.getElementById('a-days').value = sub.days || 30;
+  document.getElementById('a-ref').value = '';
+  document.getElementById('a-note').value = '';
+  document.getElementById('approve-desc').textContent =
+    `${sub.student} — ${sub.track}, ${sub.plan}. Activating starts the clock today.`;
+  showModal('approve-modal');
+}
+
+document.getElementById('approve-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const save = document.getElementById('a-save');
+  setLoading(save, true);
+  try {
+    const res = await api(`/admin/api/subscriptions/${document.getElementById('a-id').value}/approve`, {
+      method: 'POST',
+      body: {
+        payment_method: document.getElementById('a-method').value,
+        payment_reference: document.getElementById('a-ref').value.trim() || null,
+        duration_days: Number(document.getElementById('a-days').value) || null,
+        note: document.getElementById('a-note').value.trim() || null,
+      },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(save, false);
+  }
+});
+
+async function rejectSub(button, id) {
+  const ok = await confirmAction({
+    title: 'Reject this request?',
+    message: 'The student is told it was not confirmed. They can request again.',
+    confirmLabel: 'Reject',
+  });
+  if (!ok) return;
+  const reason = window.prompt('Reason (optional, shown to the student):') || null;
+  setLoading(button, true);
+  try {
+    await api(`/admin/api/subscriptions/${id}/reject`, { method: 'POST', body: { reason } });
+    showToast('Request rejected.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+async function cancelSub(button, id) {
+  const ok = await confirmAction({
+    title: 'Cancel this subscription?',
+    message: 'Access stops immediately. The payment record is kept.',
+    confirmLabel: 'Cancel it',
+  });
+  if (!ok) return;
+  const reason = window.prompt('Reason (optional):') || null;
+  setLoading(button, true);
+  try {
+    await api(`/admin/api/subscriptions/${id}/cancel`, { method: 'POST', body: { reason } });
+    showToast('Subscription cancelled.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+async function extendSub(button, id) {
+  const days = window.prompt('Add how many days?', '30');
+  if (!days) return;
+  setLoading(button, true);
+  try {
+    const res = await api(`/admin/api/subscriptions/${id}/extend`, {
+      method: 'POST',
+      body: { days: Number(days) },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+document.getElementById('grant-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const save = document.getElementById('g-save');
+  setLoading(save, true);
+  try {
+    const res = await api('/admin/api/subscriptions/grant', {
+      method: 'POST',
+      body: {
+        student_id: Number(document.getElementById('g-student').value),
+        track_id: Number(document.getElementById('g-track').value),
+        days: Number(document.getElementById('g-days').value) || 30,
+        note: document.getElementById('g-note').value.trim() || null,
+      },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(save, false);
+  }
+});
+</script>
+{% endblock %}

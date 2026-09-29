@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ lecture.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ lecture.title }}{% endblock %}
+{% block page_subtitle %}<a href="/courses/{{ course.slug }}" style="color:var(--accent)">{{ course.title }}</a>{% endblock %}
+
+{% block content %}
+<div class="player-grid">
+    <div>
+        <div class="player-frame">
+            {% if media_kind == 'file' %}
+                <video id="lecture-video" controls preload="metadata" playsinline
+                       {% if lecture.source_type.value == 'upload' %}src="{{ media_url }}"{% else %}src="{{ media_url }}" crossorigin="anonymous"{% endif %}>
+                    Your browser cannot play this video.
+                </video>
+            {% elif media_kind == 'iframe' %}
+                <iframe src="{{ media_url }}" title="{{ lecture.title }}" allowfullscreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                        referrerpolicy="strict-origin-when-cross-origin"></iframe>
+            {% else %}
+                <div class="player-missing">
+                    <svg width="30" height="30" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-link"/></svg>
+                    <div class="player-missing-title">This video can't be embedded</div>
+                    {% if lecture.video_url %}
+                    <a href="{{ lecture.video_url }}" target="_blank" rel="noopener" class="btn btn-sm mt">Open it in a new tab</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="player-bar">
+            <div class="row" style="gap:8px">
+                {% if prev_lecture %}
+                <a href="/learn/{{ prev_lecture.id }}" class="btn btn-outline btn-sm">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+                    Previous
+                </a>
+                {% endif %}
+                {% if next_lecture %}
+                <a href="/learn/{{ next_lecture.id }}" class="btn btn-outline btn-sm" id="next-lecture">
+                    Next
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-right"/></svg>
+                </a>
+                {% endif %}
+            </div>
+
+            <button class="btn btn-sm {{ 'btn-success' if completed else 'btn-soft' }}" id="complete-btn"
+                    data-completed="{{ 'true' if completed else 'false' }}">
+                <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                <span id="complete-label">{{ 'Completed' if completed else 'Mark as complete' }}</span>
+            </button>
+        </div>
+
+        {% if lecture.description %}
+        <div class="card mt">
+            <span class="section-title">About this lecture</span>
+            <p class="small muted" style="margin-top:8px;white-space:pre-wrap">{{ lecture.description }}</p>
+        </div>
+        {% endif %}
+
+        {% if notes %}
+        <div class="card card-flush mt">
+            <div class="card-head">
+                <span class="section-title">Notes for this lecture</span>
+                <span class="badge badge-muted">{{ notes|length }}</span>
+            </div>
+            {% for note in notes %}
+            <a href="/files/note/{{ note.id }}" class="note-item">
+                <span class="file-chip">{{ note.extension[:4] }}</span>
+                <div class="stack" style="flex:1;min-width:0">
+                    <span class="lecture-title truncate">{{ note.title }}</span>
+                    <span class="lecture-sub">{{ note.file_size|filesize }}</span>
+                </div>
+                <svg width="16" height="16" class="icon faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {# ---------- Course rail ---------- #}
+    <div class="rail">
+        <div class="card">
+            <div class="row" style="gap:13px">
+                <div class="ring" id="course-ring" style="--pct: {{ summary.percent }}"><span id="course-ring-pct">{{ summary.percent }}%</span></div>
+                <div class="stack">
+                    <span class="strong">{{ course.title }}</span>
+                    <span class="small muted" id="course-ring-label">{{ summary.completed }} of {{ summary.total }} done</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-flush">
+            <div class="card-head">
+                <span class="section-title">Course content</span>
+                <span class="badge badge-muted">{{ lectures|length }}</span>
+            </div>
+            <div class="lecture-list rail-scroll">
+                {% for item in lectures %}
+                {% set done = progress.get(item.id) and progress[item.id].completed %}
+                <a href="/learn/{{ item.id }}"
+                   class="lecture-item {{ 'done' if done }} {{ 'current' if item.id == lecture.id }}">
+                    <div class="lecture-index">
+                        {% if done %}
+                        <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                        {% elif item.id == lecture.id %}
+                        <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play"/></svg>
+                        {% else %}{{ loop.index }}{% endif %}
+                    </div>
+                    <div class="stack" style="flex:1;min-width:0">
+                        <span class="lecture-title truncate">{{ item.title }}</span>
+                        {% if item.duration_seconds %}
+                        <span class="lecture-sub nums">{{ item.duration_seconds|duration }}</span>
+                        {% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <a href="/courses/{{ course.slug }}" class="btn btn-outline btn-block">
+            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+            Back to course
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script id="lecture-data" type="application/json">
+{{ {
+    "lectureId": lecture.id,
+    "resumeAt": resume_at,
+    "completed": completed,
+    "isFile": media_kind == 'file',
+    "nextUrl": ("/learn/" ~ next_lecture.id) if next_lecture else None
+}|tojson }}
+</script>
+<script src="{{ asset_url('js/player.js') }}"></script>
+{% endblock %}

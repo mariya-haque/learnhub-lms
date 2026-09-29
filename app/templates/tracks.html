@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Tracks · {{ app_name }}{% endblock %}
+{% block page_title %}Tracks{% endblock %}
+{% block page_subtitle %}Exam programmes — join one and every subject inside it unlocks{% endblock %}
+
+{% block content %}
+
+<div class="row-between wrap mb" style="gap:10px">
+    <form method="get" action="/tracks" class="row wrap" style="gap:10px;flex:1">
+        <div class="input-group" style="flex:1;min-width:200px;max-width:360px">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-search"/></svg>
+            <input class="input" type="search" name="q" value="{{ q }}" placeholder="Search tracks...">
+        </div>
+        <button type="submit" class="btn">Search</button>
+        {% if q %}<a href="/tracks" class="btn btn-ghost">Clear</a>{% endif %}
+    </form>
+
+    {% if can_create %}
+    <button type="button" class="btn" onclick="showModal('track-modal')">
+        <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+        New track
+    </button>
+    {% endif %}
+</div>
+
+{% if cards %}
+<div class="grid grid-3">
+    {% for card in cards %}
+    <div class="course-card" data-row>
+        <a href="/tracks/{{ card.track.slug }}">
+            <div class="course-cover {{ card.track.accent }}">
+                <span class="course-cover-subject">{{ card.track.label }}</span>
+                <span class="course-cover-mark">
+                    <svg width="40" height="40" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg>
+                </span>
+            </div>
+        </a>
+        <div class="course-body">
+            <div class="row-between" style="gap:8px">
+                <a href="/tracks/{{ card.track.slug }}" class="course-title">{{ card.track.title }}</a>
+                {% if not card.track.is_published %}<span class="badge badge-warn">Draft</span>{% endif %}
+            </div>
+            <p class="course-desc">{{ card.track.description or 'No description yet.' }}</p>
+            <div class="course-meta">
+                <span>
+                    <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-book"/></svg>
+                    {{ card.stats.subjects }} subject{{ '' if card.stats.subjects == 1 else 's' }}
+                </span>
+                <span>
+                    <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-list"/></svg>
+                    {{ card.stats.chapters }} chapters
+                </span>
+                <span>
+                    <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg>
+                    {{ card.stats.students }}
+                </span>
+            </div>
+        </div>
+        <div class="course-foot">
+            <span class="tiny muted" style="flex:1">
+                {{ card.stats.lectures }} videos · {{ card.stats.tests }} tests
+            </span>
+            {% if card.can_manage %}
+                <a href="/teach/tracks/{{ card.track.id }}" class="btn btn-sm btn-outline">Manage</a>
+            {% elif card.joined %}
+                <a href="/tracks/{{ card.track.slug }}" class="btn btn-sm btn-soft">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                    Joined
+                </a>
+            {% elif current_user.is_teacher %}
+                <a href="/tracks/{{ card.track.slug }}" class="btn btn-sm btn-outline">View</a>
+            {% else %}
+                <button class="btn btn-sm"
+                        onclick="joinTrack(this, {{ card.track.id }}, '{{ card.track.slug }}')">
+                    Join track
+                </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-layers"/></svg>
+    </div>
+    <div class="empty-title">{% if q %}Nothing matches{% else %}No tracks yet{% endif %}</div>
+    <p class="empty-desc">
+        {% if q %}
+            No published track matches that search.
+        {% else %}
+            A track groups subjects into one programme — ECAT, SAT, MDCAT — and
+            each subject holds chapters of videos, notes and tests.
+            {% if can_create %}Create one to get started.{% endif %}
+        {% endif %}
+    </p>
+    {% if q %}<a href="/tracks" class="btn mt">Clear search</a>{% endif %}
+</div>
+{% endif %}
+
+{% if can_create %}
+<div class="modal-overlay" id="track-modal">
+    <div class="modal" style="max-width:480px">
+        <div class="row-between mb">
+            <h3 class="modal-title">New track</h3>
+            <button type="button" class="btn btn-ghost btn-icon" onclick="hideModal('track-modal')" aria-label="Close">
+                <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-close"/></svg>
+            </button>
+        </div>
+        <form id="track-form" class="stack" style="gap:12px">
+            <div class="row" style="gap:12px">
+                <div class="field" style="flex:2">
+                    <label class="label" for="track-title">Name</label>
+                    <input class="input" id="track-title" required maxlength="120"
+                           placeholder="ECAT Engineering">
+                </div>
+                <div class="field" style="flex:1">
+                    <label class="label" for="track-code">Short code</label>
+                    <input class="input" id="track-code" maxlength="16" placeholder="ECAT">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="track-desc">Description</label>
+                <textarea class="input" id="track-desc" rows="2"
+                          placeholder="Who is this programme for, and what does it cover?"></textarea>
+            </div>
+            <div class="field">
+                <label class="label" for="track-accent">Colour</label>
+                <select class="input" id="track-accent">
+                    <option value="indigo">Indigo</option>
+                    <option value="teal">Teal</option>
+                    <option value="rose">Rose</option>
+                    <option value="amber">Amber</option>
+                    <option value="purple">Purple</option>
+                    <option value="blue">Blue</option>
+                </select>
+            </div>
+            <label class="row" style="gap:8px;cursor:pointer">
+                <input type="checkbox" id="track-published">
+                <span class="small">Publish immediately — students can find and join it</span>
+            </label>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="hideModal('track-modal')">Cancel</button>
+                <button type="submit" class="btn" id="track-save">Create track</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function joinTrack(button, trackId, slug) {
+  setLoading(button, true);
+  try {
+    const res = await api(`/tracks/${trackId}/join`, { method: 'POST' });
+    showToast(res.message || 'Joined.', 'success');
+    setTimeout(() => { window.location.href = `/tracks/${slug}`; }, 600);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+
+const trackForm = document.getElementById('track-form');
+if (trackForm) {
+  trackForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const save = document.getElementById('track-save');
+    setLoading(save, true);
+    try {
+      const res = await api('/teach/api/tracks', {
+        method: 'POST',
+        body: {
+          title: document.getElementById('track-title').value.trim(),
+          code: document.getElementById('track-code').value.trim() || null,
+          description: document.getElementById('track-desc').value.trim() || null,
+          accent: document.getElementById('track-accent').value,
+          is_published: document.getElementById('track-published').checked,
+        },
+      });
+      showToast('Track created.', 'success');
+      window.location.href = res.redirect;
+    } catch (error) {
+      showToast(error.message, 'error');
+      setLoading(save, false);
+    }
+  });
+}
+</script>
+{% endblock %}

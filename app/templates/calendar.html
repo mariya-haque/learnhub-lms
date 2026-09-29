@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Calendar · {{ app_name }}{% endblock %}
+{% block page_title %}Calendar{% endblock %}
+{% block page_subtitle %}
+    {% if can_schedule %}Schedule live classes and see everything coming up
+    {% else %}Live classes for the courses you're enrolled in{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="row-between wrap mb">
+    <div class="cal-nav">
+        <button type="button" class="btn btn-ghost btn-icon" id="cal-prev" aria-label="Previous month">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+        </button>
+        <h2 class="cal-month" id="cal-month">&nbsp;</h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="cal-next" aria-label="Next month">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-right"/></svg>
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" id="cal-today">Today</button>
+    </div>
+
+    {% if can_schedule %}
+    <button type="button" class="btn" id="cal-new">
+        <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+        Schedule a class
+    </button>
+    {% endif %}
+</div>
+
+<div class="cal-layout">
+    {# ------------------------------- Month grid ------------------------------ #}
+    <div class="card cal-card">
+        <div class="cal-weekdays">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>
+            <span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    {# ------------------------------- Side rail ------------------------------- #}
+    <div class="stack" style="gap:16px">
+        <div class="card">
+            <div class="row-between mb">
+                <span class="strong">Coming up</span>
+                <span class="badge badge-info" id="cal-live-count" hidden>Live now</span>
+            </div>
+            <div class="stack" id="cal-upcoming" style="gap:10px">
+                {% if not upcoming %}
+                <p class="small muted">
+                    Nothing scheduled.
+                    {% if can_schedule %}Use <em>Schedule a class</em> to add one.{% endif %}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="strong mb">Selected day</div>
+            <div id="cal-day-detail" class="stack" style="gap:10px">
+                <p class="small muted">Pick a day in the calendar to see its classes.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# --------------------------- Schedule / edit modal --------------------------- #}
+{% if can_schedule %}
+<div class="modal-overlay" id="class-modal">
+    <div class="modal" style="max-width:520px">
+        <div class="row-between mb">
+            <h3 class="modal-title" id="class-modal-title">Schedule a class</h3>
+            <button type="button" class="btn btn-ghost btn-icon" onclick="hideModal('class-modal')" aria-label="Close">
+                <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-close"/></svg>
+            </button>
+        </div>
+
+        <form id="class-form" class="stack" style="gap:12px">
+            <input type="hidden" id="class-id">
+
+            <div class="field">
+                <label class="label" for="class-title">Title</label>
+                <input class="input" id="class-title" required maxlength="160"
+                       placeholder="Live doubt-clearing session">
+            </div>
+
+            <div class="field">
+                <label class="label" for="class-course">Course</label>
+                <select class="input" id="class-course" required>
+                    {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="row" style="gap:12px">
+                <div class="field" style="flex:2">
+                    <label class="label" for="class-start">Starts</label>
+                    <input class="input" id="class-start" type="datetime-local" required>
+                </div>
+                <div class="field" style="flex:1">
+                    <label class="label" for="class-duration">Minutes</label>
+                    <input class="input" id="class-duration" type="number" min="5" max="480"
+                           step="5" value="60" required>
+                </div>
+            </div>
+            <p class="tiny muted" style="margin-top:-6px">
+                Times use your device's timezone; every student sees it in theirs.
+            </p>
+
+            <div class="field">
+                <label class="label">Meeting room</label>
+                <div class="seg" role="radiogroup">
+                    <label class="seg-option">
+                        <input type="radio" name="provider" value="builtin" checked>
+                        <span>Built-in room</span>
+                    </label>
+                    <label class="seg-option">
+                        <input type="radio" name="provider" value="external">
+                        <span>My own link</span>
+                    </label>
+                </div>
+                <p class="tiny muted" id="provider-hint" style="margin-top:6px">
+                    A private room is created for you — nobody needs an account.
+                </p>
+            </div>
+
+            <div class="field" id="external-field" hidden>
+                <label class="label" for="class-url">Meeting link</label>
+                <input class="input" id="class-url" type="url"
+                       placeholder="https://zoom.us/j/… or https://meet.google.com/…">
+            </div>
+
+            <div class="field">
+                <label class="label" for="class-desc">Description <span class="muted">(optional)</span></label>
+                <textarea class="input" id="class-desc" rows="2"
+                          placeholder="What will you cover?"></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" id="class-delete" hidden>Delete</button>
+                <span style="flex:1"></span>
+                <button type="button" class="btn btn-outline" onclick="hideModal('class-modal')">Cancel</button>
+                <button type="submit" class="btn" id="class-save">Schedule</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script id="calendar-data" type="application/json">
+    {{ {"upcoming": upcoming, "canSchedule": can_schedule, "courses": courses} | tojson }}
+</script>
+<script src="{{ asset_url('js/calendar.js') }}"></script>
+{% endblock %}

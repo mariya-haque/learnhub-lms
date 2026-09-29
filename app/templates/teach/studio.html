@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Studio · {{ app_name }}{% endblock %}
+{% block page_title %}Teaching studio{% endblock %}
+{% block page_subtitle %}Everything you've published, in one place{% endblock %}
+
+{% block content %}
+
+<div class="stat-row">
+    <div class="stat">
+        <div class="stat-icon"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-book"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ totals.courses }}</span><span class="stat-label">Courses</span></div>
+    </div>
+    <div class="stat">
+        <div class="stat-icon teal"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ totals.students }}</span><span class="stat-label">Enrollments</span></div>
+    </div>
+    <div class="stat">
+        <div class="stat-icon purple"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg></div>
+        <div class="stack"><span class="stat-value">{{ totals.lectures }}</span><span class="stat-label">Lectures</span></div>
+    </div>
+    <div class="stat">
+        <div class="stat-icon amber"><svg width="18" height="18" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg></div>
+        <div class="stack">
+            <span class="stat-value">{{ totals.average }}%</span>
+            <span class="stat-label">Class average ({{ totals.submissions }} submissions)</span>
+        </div>
+    </div>
+</div>
+
+<div class="split">
+    <div>
+        <div class="section-head">
+            <div class="stack">
+                <span class="section-title">Your courses</span>
+                <span class="section-sub">Drafts are only visible to you</span>
+            </div>
+            <button class="btn" onclick="showModal('new-course-modal')">
+                <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+                New course
+            </button>
+        </div>
+
+        {% if cards %}
+        <div class="grid grid-2">
+            {% for card in cards %}
+            <div class="course-card">
+                <a href="/teach/courses/{{ card.course.id }}">
+                    <div class="course-cover {{ card.course.accent }}">
+                        <span class="course-cover-subject">{{ card.course.subject or 'Course' }}</span>
+                        <span class="course-cover-mark">
+                            <svg width="40" height="40" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-book"/></svg>
+                        </span>
+                    </div>
+                </a>
+                <div class="course-body">
+                    <div class="row-between">
+                        <a href="/teach/courses/{{ card.course.id }}" class="course-title">{{ card.course.title }}</a>
+                        <span class="badge {{ 'badge-success' if card.course.is_published else 'badge-muted' }}">
+                            {{ 'Live' if card.course.is_published else 'Draft' }}
+                        </span>
+                    </div>
+                    <p class="course-desc">{{ card.course.description or 'No description yet.' }}</p>
+                    <div class="course-meta">
+                        <span>
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play-circle"/></svg>
+                            {{ card.stats.lectures }}
+                        </span>
+                        <span>
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                            {{ card.stats.tests }}
+                        </span>
+                        <span>
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg>
+                            {{ card.stats.students }}
+                        </span>
+                    </div>
+                </div>
+                <div class="course-foot">
+                    <a href="/teach/courses/{{ card.course.id }}" class="btn btn-sm btn-outline" style="flex:1">Manage</a>
+                    <a href="/teach/courses/{{ card.course.id }}/students" class="btn btn-sm btn-ghost">Students</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card empty">
+            <div class="empty-icon">
+                <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-book"/></svg>
+            </div>
+            <div class="empty-title">No courses yet</div>
+            <p class="empty-desc">Create a course, add some lectures and a test, then publish it for students to enroll.</p>
+            <button class="btn mt" onclick="showModal('new-course-modal')">Create your first course</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="rail">
+        <div class="card card-flush">
+            <div class="card-head">
+                <span class="section-title">Recent submissions</span>
+            </div>
+            {% if recent %}
+            <div>
+                {% for attempt in recent %}
+                <a href="/teach/tests/{{ attempt.test_id }}/results" class="note-item">
+                    <div class="avatar" style="width:32px;height:32px;font-size:12px">{{ attempt.student.initial }}</div>
+                    <div class="stack" style="flex:1;min-width:0">
+                        <span class="lecture-title truncate">{{ attempt.student.display_name }}</span>
+                        <span class="lecture-sub truncate">{{ attempt.test.title }}</span>
+                    </div>
+                    <span class="badge {{ 'badge-success' if attempt.passed else 'badge-error' }}">{{ attempt.percent }}%</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty" style="padding:26px 20px">
+                <div class="empty-desc">No one has submitted a test yet.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---------- New course ---------- #}
+<div class="modal-overlay" id="new-course-modal">
+    <div class="modal">
+        <h3 class="modal-title">New course</h3>
+        <p class="modal-desc">You can add lectures, notes and tests once it exists.</p>
+
+        <form id="new-course-form">
+            <div class="field">
+                <label class="label" for="c-title">Title</label>
+                <input class="input" id="c-title" name="title" required minlength="2" maxlength="120"
+                       placeholder="Calculus Foundations">
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label class="label" for="c-subject">Subject</label>
+                    <input class="input" id="c-subject" name="subject" maxlength="60" placeholder="Mathematics">
+                </div>
+                <div class="field">
+                    <label class="label" for="c-accent">Cover colour</label>
+                    <select class="select" id="c-accent" name="accent">
+                        <option value="indigo">Indigo</option>
+                        <option value="teal">Teal</option>
+                        <option value="rose">Rose</option>
+                        <option value="amber">Amber</option>
+                        <option value="purple">Purple</option>
+                        <option value="blue">Blue</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="c-desc">Description</label>
+                <textarea class="textarea" id="c-desc" name="description"
+                          placeholder="What will students learn, and in what order?"></textarea>
+            </div>
+            <label class="check">
+                <input type="checkbox" id="c-published" name="is_published">
+                <span>Publish immediately <span class="hint">— students can find and enroll straight away</span></span>
+            </label>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="hideModal('new-course-modal')">Cancel</button>
+                <button type="submit" class="btn">Create course</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('new-course-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const btn = event.target.querySelector('[type="submit"]');
+  setLoading(btn, true);
+  try {
+    const result = await api('/teach/api/courses', {
+      method: 'POST',
+      body: {
+        title: document.getElementById('c-title').value.trim(),
+        subject: document.getElementById('c-subject').value.trim() || null,
+        accent: document.getElementById('c-accent').value,
+        description: document.getElementById('c-desc').value.trim() || null,
+        is_published: document.getElementById('c-published').checked,
+      },
+    });
+    showToast('Course created.', 'success');
+    window.location.href = result.redirect;
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(btn, false);
+  }
+});
+</script>
+{% endblock %}

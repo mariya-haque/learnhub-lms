@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}{{ track.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ track.title }}{% endblock %}
+{% block page_subtitle %}{{ stats.subjects }} subjects · {{ stats.chapters }} chapters · {{ stats.students }} students{% endblock %}
+
+{% block content %}
+
+<div class="row-between wrap mb" style="gap:10px">
+    <a href="/tracks" class="btn btn-ghost btn-sm">
+        <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+        All tracks
+    </a>
+    <div class="row" style="gap:8px">
+        <a href="/tracks/{{ track.slug }}" class="btn btn-outline btn-sm">
+            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg>
+            View as student
+        </a>
+        <button class="btn btn-ghost btn-sm" data-delete="/teach/api/tracks/{{ track.id }}"
+                data-redirect="/tracks"
+                data-confirm-title="Delete this track?"
+                data-confirm-message="Its subjects are kept and simply unfiled — no lectures, notes or tests are deleted."
+                data-success-message="Track deleted.">
+            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg>
+            Delete
+        </button>
+    </div>
+</div>
+
+{# ------------------------------ Track settings ----------------------------- #}
+<div class="card mb">
+    <div class="row-between mb">
+        <span class="strong">Track settings</span>
+        <span class="badge {{ 'badge-success' if track.is_published else 'badge-warn' }}">
+            {{ 'Published' if track.is_published else 'Draft' }}
+        </span>
+    </div>
+    <form id="track-settings" class="stack" style="gap:12px">
+        <div class="row wrap" style="gap:12px">
+            <div class="field" style="flex:2;min-width:200px">
+                <label class="label" for="t-title">Name</label>
+                <input class="input" id="t-title" value="{{ track.title }}" maxlength="120" required>
+            </div>
+            <div class="field" style="flex:1;min-width:110px">
+                <label class="label" for="t-code">Short code</label>
+                <input class="input" id="t-code" value="{{ track.code or '' }}" maxlength="16">
+            </div>
+            <div class="field" style="flex:1;min-width:130px">
+                <label class="label" for="t-accent">Colour</label>
+                <select class="input" id="t-accent">
+                    {% for name in ['indigo','teal','rose','amber','purple','blue'] %}
+                    <option value="{{ name }}" {% if track.accent == name %}selected{% endif %}>{{ name|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label" for="t-desc">Description</label>
+            <textarea class="input" id="t-desc" rows="2">{{ track.description or '' }}</textarea>
+        </div>
+        <div class="stack" style="gap:8px">
+            <label class="row" style="gap:8px;cursor:pointer">
+                <input type="checkbox" id="t-published" {% if track.is_published %}checked{% endif %}>
+                <span class="small">Published — students can find and join this track</span>
+            </label>
+            <label class="row" style="gap:8px;cursor:pointer">
+                <input type="checkbox" id="t-paid" {% if track.requires_subscription %}checked{% endif %}>
+                <span class="small">
+                    Require a subscription — students must hold an active plan to open its subjects
+                </span>
+            </label>
+            {% if track.requires_subscription and not plans %}
+            <span class="tiny" style="color:var(--warn)">
+                This track is paid but has no plans, so nobody can buy access. Add one below.
+            </span>
+            {% endif %}
+        </div>
+        <div class="row-between wrap" style="gap:10px">
+            <span class="tiny muted">
+                {{ subscribers | selectattr('is_current') | list | length }} active subscriber(s)
+            </span>
+            <button type="submit" class="btn btn-sm" id="t-save">Save settings</button>
+        </div>
+    </form>
+</div>
+
+{# ---------------------------------- Plans --------------------------------- #}
+<div class="card mb">
+    <div class="row-between wrap mb" style="gap:10px">
+        <div class="stack">
+            <span class="strong">Plans</span>
+            <span class="tiny muted">
+                What this track costs. Payment is recorded by an admin — nothing is charged here.
+            </span>
+        </div>
+        <button class="btn btn-sm" onclick="openPlan()">
+            <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+            Add plan
+        </button>
+    </div>
+
+    {% if plans %}
+    <div class="grid grid-3">
+        {% for plan in plans %}
+        <div class="plan-card {{ 'is-off' if not plan.is_active }}" data-row>
+            <div class="row-between" style="gap:6px">
+                <span class="plan-name">{{ plan.name }}</span>
+                {% if not plan.is_active %}<span class="badge badge-muted">Off</span>{% endif %}
+            </div>
+            <span class="plan-price">{{ plan.price_minor | money(plan.currency) }}</span>
+            <span class="tiny muted">for {{ plan.duration_days }} days</span>
+            {% if plan.description %}
+            <p class="tiny muted" style="margin-top:6px">{{ plan.description }}</p>
+            {% endif %}
+            <div class="row mt" style="gap:6px">
+                <button class="btn btn-outline btn-sm" style="flex:1"
+                        onclick='openPlan({{ {
+                            "id": plan.id, "name": plan.name,
+                            "description": plan.description or "",
+                            "price": plan.price_minor / 100,
+                            "currency": plan.currency,
+                            "duration_days": plan.duration_days,
+                            "is_active": plan.is_active,
+                        } | tojson }})'>Edit</button>
+                <button class="btn btn-ghost btn-icon btn-sm"
+                        data-delete="/teach/api/plans/{{ plan.id }}"
+                        data-confirm-title="Remove this plan?"
+                        data-confirm-message="Nobody can buy it after this. Subscriptions already sold keep their own price and stay active."
+                        data-success-message="Plan removed."
+                        aria-label="Delete plan">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="small muted">
+        No plans yet. A track with no plans cannot be sold, even with billing turned on.
+    </p>
+    {% endif %}
+</div>
+
+{# ------------------------------ Subscribers -------------------------------- #}
+{% if subscribers %}
+<div class="card mb">
+    <div class="row-between mb">
+        <span class="strong">Subscribers</span>
+        <a href="/admin/subscriptions" class="tiny" style="color:var(--accent)">Manage payments →</a>
+    </div>
+    <div class="stack" style="gap:8px">
+        {% for sub in subscribers[:10] %}
+        <div class="row-between">
+            <div class="stack" style="gap:1px;flex:1;min-width:0">
+                <span class="small ellipsis">{{ sub.student.display_name }}</span>
+                <span class="tiny muted">
+                    {{ sub.plan_name or 'Custom' }} · {{ sub.price_minor | money(sub.currency) }}
+                </span>
+            </div>
+            {% if sub.is_current %}
+                <span class="badge badge-success">{{ sub.days_left }}d left</span>
+            {% elif sub.status.value == 'pending' %}
+                <span class="badge badge-warn">Pending</span>
+            {% else %}
+                <span class="badge badge-muted">{{ sub.status.value|title }}</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{# ------------------------------ Plan modal --------------------------------- #}
+<div class="modal-overlay" id="plan-modal">
+    <div class="modal" style="max-width:460px">
+        <h3 class="modal-title" id="plan-modal-title">Add plan</h3>
+        <form id="plan-form" class="stack mt" style="gap:12px">
+            <input type="hidden" id="p-id">
+            <div class="field">
+                <label class="label" for="p-name">Name</label>
+                <input class="input" id="p-name" required maxlength="60" placeholder="Monthly">
+            </div>
+            <div class="row wrap" style="gap:12px">
+                <div class="field" style="flex:1;min-width:120px">
+                    <label class="label" for="p-price">Price</label>
+                    <input class="input" id="p-price" type="number" min="0" step="0.01"
+                           required placeholder="2500">
+                </div>
+                <div class="field" style="flex:1;min-width:100px">
+                    <label class="label" for="p-currency">Currency</label>
+                    <select class="input" id="p-currency">
+                        {% for code in ['PKR','USD','GBP','EUR'] %}
+                        <option value="{{ code }}">{{ code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field" style="flex:1;min-width:110px">
+                    <label class="label" for="p-days">Days</label>
+                    <input class="input" id="p-days" type="number" min="1" max="3650" value="30" required>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="p-desc">Description <span class="muted">(optional)</span></label>
+                <input class="input" id="p-desc" placeholder="Full access to every subject in this track">
+            </div>
+            <label class="row" style="gap:8px;cursor:pointer">
+                <input type="checkbox" id="p-active" checked>
+                <span class="small">On sale</span>
+            </label>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="hideModal('plan-modal')">Cancel</button>
+                <button type="submit" class="btn" id="p-save">Add plan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# --------------------------------- Subjects -------------------------------- #}
+<div class="card mb">
+    <div class="row-between wrap mb" style="gap:10px">
+        <span class="strong">Subjects in this track</span>
+        {% if available %}
+        <form class="row" style="gap:8px" id="add-subject-form">
+            <select class="input" id="add-subject" style="min-width:200px">
+                {% for course in available %}
+                <option value="{{ course.id }}">{{ course.title }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm">
+                <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+                Add subject
+            </button>
+        </form>
+        {% else %}
+        <span class="tiny muted">
+            Every course you own is already in a track.
+            <a href="/teach" style="color:var(--accent)">Create another</a> to add one.
+        </span>
+        {% endif %}
+    </div>
+
+    {% if rows %}
+    <div class="stack" style="gap:10px">
+        {% for row in rows %}
+        <div class="cal-summary" data-row>
+            <span class="cal-stripe accent-{{ row.subject.accent }}"></span>
+            <div class="stack" style="gap:2px;flex:1;min-width:0">
+                <a href="/teach/courses/{{ row.subject.id }}" class="strong small ellipsis">{{ row.subject.title }}</a>
+                <span class="tiny muted">
+                    {{ row.chapters|length }} chapter{{ '' if row.chapters|length == 1 else 's' }} ·
+                    {{ row.stats.lectures }} videos · {{ row.stats.tests }} tests ·
+                    {{ row.stats.students }} direct enrollments
+                </span>
+            </div>
+            <div class="row" style="gap:6px">
+                {% if not row.subject.is_published %}<span class="badge badge-warn">Draft</span>{% endif %}
+                <a href="/teach/courses/{{ row.subject.id }}" class="btn btn-sm btn-outline">Chapters</a>
+                <button class="btn btn-ghost btn-icon btn-sm"
+                        onclick="removeSubject(this, {{ row.subject.id }})"
+                        aria-label="Remove from track" title="Remove from this track">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-close"/></svg>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty" style="padding:26px 10px">
+        <div class="empty-title">No subjects yet</div>
+        <p class="empty-desc">
+            A subject is one of your courses filed into this track. Add one above,
+            then open it to break it into chapters.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('track-settings').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const save = document.getElementById('t-save');
+  setLoading(save, true);
+  try {
+    await api('/teach/api/tracks/{{ track.id }}', {
+      method: 'PUT',
+      body: {
+        title: document.getElementById('t-title').value.trim(),
+        code: document.getElementById('t-code').value.trim() || null,
+        description: document.getElementById('t-desc').value.trim() || null,
+        accent: document.getElementById('t-accent').value,
+        is_published: document.getElementById('t-published').checked,
+        requires_subscription: document.getElementById('t-paid').checked,
+      },
+    });
+    showToast('Saved.', 'success');
+    setTimeout(() => window.location.reload(), 500);
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    setLoading(save, false);
+  }
+});
+
+const addForm = document.getElementById('add-subject-form');
+if (addForm) {
+  addForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      await api('/teach/api/tracks/{{ track.id }}/subjects', {
+        method: 'POST',
+        body: { course_id: Number(document.getElementById('add-subject').value) },
+      });
+      showToast('Subject added.', 'success');
+      window.location.reload();
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+}
+
+/* ---------------------------------- Plans -------------------------------- */
+
+function openPlan(plan) {
+  const editing = Boolean(plan);
+  document.getElementById('plan-modal-title').textContent = editing ? 'Edit plan' : 'Add plan';
+  document.getElementById('p-save').textContent = editing ? 'Save plan' : 'Add plan';
+  document.getElementById('p-id').value = editing ? plan.id : '';
+  document.getElementById('p-name').value = editing ? plan.name : '';
+  document.getElementById('p-price').value = editing ? plan.price : '';
+  document.getElementById('p-currency').value = editing ? plan.currency : 'PKR';
+  document.getElementById('p-days').value = editing ? plan.duration_days : 30;
+  document.getElementById('p-desc').value = editing ? plan.description : '';
+  document.getElementById('p-active').checked = editing ? plan.is_active : true;
+  showModal('plan-modal');
+}
+
+document.getElementById('plan-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const id = document.getElementById('p-id').value;
+  const save = document.getElementById('p-save');
+
+  // The form takes rupees; the server stores paisa. Rounding here rather than
+  // storing a float is what keeps 2500.00 from ever becoming 2499.9999.
+  const price = Number(document.getElementById('p-price').value || 0);
+  const body = {
+    name: document.getElementById('p-name').value.trim(),
+    description: document.getElementById('p-desc').value.trim() || null,
+    price_minor: Math.round(price * 100),
+    currency: document.getElementById('p-currency').value,
+    duration_days: Number(document.getElementById('p-days').value) || 30,
+    is_active: document.getElementById('p-active').checked,
+  };
+
+  setLoading(save, true);
+  try {
+    if (id) {
+      await api(`/teach/api/plans/${id}`, { method: 'PUT', body });
+    } else {
+      await api('/teach/api/tracks/{{ track.id }}/plans', { method: 'POST', body });
+    }
+    showToast('Plan saved.', 'success');
+    window.location.reload();
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(save, false);
+  }
+});
+
+async function removeSubject(button, courseId) {
+  const ok = await confirmAction({
+    title: 'Remove from this track?',
+    message: 'The subject and everything in it is kept — it just leaves the track.',
+    confirmLabel: 'Remove',
+    danger: false,
+  });
+  if (!ok) return;
+  setLoading(button, true);
+  try {
+    await api(`/teach/api/tracks/{{ track.id }}/subjects/${courseId}`, { method: 'DELETE' });
+    showToast('Removed from the track.', 'success');
+    window.location.reload();
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,42 @@
+# Render blueprint: a permanent URL instead of a tunnel that dies with the laptop.
+#
+# Push this repo to GitHub, then on render.com: New > Blueprint > pick the repo.
+# Render reads this file and creates both services.
+#
+# The Postgres database is the important part. The app defaults to SQLite in a
+# file, and a container filesystem is wiped on every deploy -- so on a host,
+# SQLite means losing every account, attempt and payment record each time you
+# ship. DATABASE_URL is wired in below so that cannot happen.
+
+services:
+  - type: web
+    name: learnhub
+    runtime: docker
+    plan: free
+    healthCheckPath: /login
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: learnhub-db
+          property: connectionString
+
+      # Generated once by Render and then held. Every session cookie is signed
+      # with it, so changing it signs everybody out.
+      - key: SECRET_KEY
+        generateValue: true
+
+      - key: DEBUG
+        value: "false"
+
+      # Never advertise the demo logins on a public sign-in page.
+      - key: SHOW_DEMO_CREDENTIALS
+        value: "false"
+
+      # Leave true for a demo deployment so the site has content on first boot.
+      # Set false for real use, then delete the admin/teacher/student accounts.
+      - key: SEED_DEMO_DATA
+        value: "true"
+
+databases:
+  - name: learnhub-db
+    plan: free

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}No access · {{ app_name }}{% endblock %}
+{% block page_title %}No access{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="empty-icon" style="width:60px;height:60px">
+        <svg width="26" height="26" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg>
+    </div>
+    <h2 class="error-title">You can't open this</h2>
+    <p class="error-desc">{{ message or "You don't have permission to view this page." }}</p>
+    <div class="btn-group mt">
+        <a href="{{ '/teach' if current_user and current_user.is_teacher else '/dashboard' }}" class="btn">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+            Back to safety
+        </a>
+        {% if course %}
+        <a href="/courses/{{ course.slug }}" class="btn btn-outline">Go to the course</a>
+        {% else %}
+        <a href="/courses" class="btn btn-outline">Browse courses</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

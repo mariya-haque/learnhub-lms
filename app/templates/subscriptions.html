@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Subscriptions · {{ app_name }}{% endblock %}
+{% block page_title %}Subscriptions{% endblock %}
+{% block page_subtitle %}Your access, and what else is available{% endblock %}
+
+{% block content %}
+
+{% set active = subscriptions | selectattr('is_current') | list %}
+{% set waiting = subscriptions | selectattr('status.value', 'equalto', 'pending') | list %}
+
+{% if waiting %}
+<div class="alert alert-info mb">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+    <span>
+        {{ waiting|length }} request{{ '' if waiting|length == 1 else 's' }} waiting for
+        confirmation. Access opens as soon as an administrator records your payment.
+    </span>
+</div>
+{% endif %}
+
+{# ----------------------------- What you have ----------------------------- #}
+<div class="section-head">
+    <div class="stack">
+        <span class="section-title">Your subscriptions</span>
+        <span class="section-sub">{{ active|length }} active</span>
+    </div>
+</div>
+
+{% if subscriptions %}
+<div class="stack mb" style="gap:10px">
+    {% for sub in subscriptions %}
+    <div class="card sub-row">
+        <div class="row-between wrap" style="gap:12px">
+            <div class="row" style="gap:12px;flex:1;min-width:200px">
+                <div class="track-badge {{ sub.track.accent if sub.track else 'indigo' }}">
+                    {{ sub.track.label if sub.track else '—' }}
+                </div>
+                <div class="stack" style="gap:3px;flex:1;min-width:0">
+                    <span class="strong">{{ sub.track.title if sub.track else 'Removed track' }}</span>
+                    <span class="tiny muted">
+                        {{ sub.plan_name or 'Subscription' }}
+                        {% if sub.price_minor %} · {{ sub.price_minor | money(sub.currency) }}{% endif %}
+                    </span>
+                    {% if sub.is_current and sub.expires_at_utc %}
+                    <span class="tiny muted">
+                        {{ sub.days_left }} day{{ '' if sub.days_left == 1 else 's' }} left ·
+                        renews or ends {{ sub.expires_at_utc.strftime('%d %b %Y') }}
+                    </span>
+                    {% elif sub.status.value == 'pending' %}
+                    <span class="tiny muted">Requested {{ sub.requested_at.strftime('%d %b') }}</span>
+                    {% elif sub.note %}
+                    <span class="tiny muted">{{ sub.note }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="row" style="gap:8px">
+                {% if sub.is_current %}
+                    <span class="badge badge-success">Active</span>
+                    <a href="/tracks/{{ sub.track.slug }}" class="btn btn-sm">Open track</a>
+                {% elif sub.status.value == 'pending' %}
+                    <span class="badge badge-warn">Awaiting payment</span>
+                {% elif sub.status.value == 'expired' %}
+                    <span class="badge badge-muted">Expired</span>
+                    <a href="/tracks/{{ sub.track.slug }}" class="btn btn-sm btn-outline">Renew</a>
+                {% elif sub.status.value == 'cancelled' %}
+                    <span class="badge badge-error">Cancelled</span>
+                {% else %}
+                    <span class="badge badge-error">Rejected</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card empty mb">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-card"/></svg>
+    </div>
+    <div class="empty-title">No subscriptions yet</div>
+    <p class="empty-desc">Free tracks need no subscription — just join them from the catalogue.</p>
+    <a href="/tracks" class="btn mt">Browse tracks</a>
+</div>
+{% endif %}
+
+{# ------------------------------- Available ------------------------------- #}
+{% if offers %}
+<div class="section-head">
+    <div class="stack">
+        <span class="section-title">Available</span>
+        <span class="section-sub">Payment is arranged with your institute; access opens once it is confirmed</span>
+    </div>
+</div>
+
+{% for offer in offers %}
+<div class="card mb">
+    <div class="row" style="gap:12px;margin-bottom:12px">
+        <div class="track-badge {{ offer.track.accent }}">{{ offer.track.label }}</div>
+        <div class="stack" style="gap:2px;flex:1;min-width:0">
+            <a href="/tracks/{{ offer.track.slug }}" class="strong">{{ offer.track.title }}</a>
+            <span class="tiny muted">{{ offer.track.description or 'No description.' }}</span>
+        </div>
+    </div>
+    <div class="grid grid-3">
+        {% for plan in offer.plans %}
+        <div class="plan-card">
+            <span class="plan-name">{{ plan.name }}</span>
+            <span class="plan-price">{{ plan.price_minor | money(plan.currency) }}</span>
+            <span class="tiny muted">for {{ plan.duration_days }} days</span>
+            {% if plan.description %}
+            <p class="tiny muted" style="margin-top:6px">{{ plan.description }}</p>
+            {% endif %}
+            <button class="btn btn-sm mt" style="width:100%"
+                    onclick="requestPlan(this, {{ plan.id }})">Request</button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function requestPlan(button, planId) {
+  setLoading(button, true);
+  try {
+    const res = await api('/subscriptions/request', {
+      method: 'POST',
+      body: { plan_id: planId },
+    });
+    showToast(res.message, 'success');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (error) {
+    showToast(error.message, 'error');
+    setLoading(button, false);
+  }
+}
+</script>
+{% endblock %}

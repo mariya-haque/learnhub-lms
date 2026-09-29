@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ test.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ test.title }}{% endblock %}
+{% block page_subtitle %}<a href="/teach/courses/{{ course.id }}" style="color:var(--accent)">{{ course.title }}</a> · test builder{% endblock %}
+
+{% block content %}
+
+{% if attempts %}
+<div class="alert alert-warn">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg>
+    <span>
+        <strong>Questions are locked.</strong>
+        {{ attempts }} student{{ '' if attempts == 1 else 's' }} already sat this test — editing the questions
+        would invalidate their marks. Delete the test and rebuild it if you need changes.
+    </span>
+</div>
+{% endif %}
+
+<div class="split">
+    <div>
+        <div class="section-head">
+            <div class="stack">
+                <span class="section-title">Questions</span>
+                <span class="section-sub" id="marks-note">0 questions · 0 marks</span>
+            </div>
+        </div>
+
+        <div id="question-list"></div>
+
+        {% if not attempts %}
+        <div class="btn-group mt">
+            <button class="btn btn-outline" onclick="addQuestion('single')">
+                <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+                Multiple choice
+            </button>
+            <button class="btn btn-outline" onclick="addQuestion('multi')">Select many</button>
+            <button class="btn btn-outline" onclick="addQuestion('truefalse')">True / false</button>
+            <button class="btn btn-outline" onclick="addQuestion('numeric')">Numeric</button>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ---------- Settings rail ---------- #}
+    <div class="rail">
+        <div class="card">
+            <span class="section-title">Test settings</span>
+
+            <div class="field mt">
+                <label class="label" for="s-title">Title</label>
+                <input class="input" id="s-title" value="{{ test.title }}">
+            </div>
+
+            <div class="field">
+                <label class="label" for="s-desc">Description</label>
+                <textarea class="textarea" id="s-desc" style="min-height:64px">{{ test.description or '' }}</textarea>
+            </div>
+
+            <div class="field">
+                <label class="label" for="s-kind">Kind</label>
+                <select class="select" id="s-kind">
+                    <option value="practice" {% if test.kind.value == 'practice' %}selected{% endif %}>Practice — untimed, repeatable</option>
+                    <option value="grand" {% if test.kind.value == 'grand' %}selected{% endif %}>Grand — timed, one attempt</option>
+                </select>
+            </div>
+
+            <div class="field-row">
+                <div class="field" id="s-duration-field">
+                    <label class="label" for="s-duration">Minutes</label>
+                    <input class="input nums" type="number" id="s-duration" min="1" max="600"
+                           value="{{ test.duration_minutes or 30 }}">
+                </div>
+                <div class="field">
+                    <label class="label" for="s-pass">Pass %</label>
+                    <input class="input nums" type="number" id="s-pass" min="0" max="100" value="{{ test.pass_percent }}">
+                </div>
+            </div>
+
+            <div class="field" id="s-attempts-field">
+                <label class="label" for="s-attempts">Max attempts <span class="hint">(blank = unlimited)</span></label>
+                <input class="input nums" type="number" id="s-attempts" min="1" value="{{ test.max_attempts or '' }}">
+            </div>
+
+            <div class="switch-row">
+                <label class="check" for="s-negative" style="padding:0">
+                    <input type="checkbox" id="s-negative" {% if test.negative_marking %}checked{% endif %}>
+                    <span>Negative marking</span>
+                </label>
+            </div>
+            <div class="switch-row">
+                <label class="check" for="s-shuffle" style="padding:0">
+                    <input type="checkbox" id="s-shuffle" {% if test.shuffle_questions %}checked{% endif %}>
+                    <span>Shuffle questions</span>
+                </label>
+            </div>
+            <div class="switch-row">
+                <label class="check" for="s-published" style="padding:0">
+                    <input type="checkbox" id="s-published" {% if test.is_published %}checked{% endif %}>
+                    <span>Published <span class="hint">— visible to students</span></span>
+                </label>
+            </div>
+
+            <p class="tiny faint mt" id="kind-note"></p>
+        </div>
+
+        <div class="card">
+            <div class="row-between">
+                <span class="small muted">Questions</span>
+                <span class="strong nums" id="count-badge">0</span>
+            </div>
+            <div class="row-between" style="margin-top:6px">
+                <span class="small muted">Total marks</span>
+                <span class="strong nums" id="marks-badge">0</span>
+            </div>
+            <a href="/teach/tests/{{ test.id }}/results" class="btn btn-outline btn-block mt">View results</a>
+        </div>
+    </div>
+</div>
+
+{% if not attempts %}
+<div class="builder-toolbar">
+    <div class="stack">
+        <span class="strong" id="toolbar-summary">0 questions · 0 marks</span>
+        <span class="tiny faint">Saving replaces the whole question set.</span>
+    </div>
+    <div class="btn-group">
+        <a href="/teach/courses/{{ course.id }}" class="btn btn-outline">Back to course</a>
+        <button class="btn" id="save-btn">
+            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+            Save test
+        </button>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script id="test-data" type="application/json">{{ payload|tojson }}</script>
+<script src="{{ asset_url('js/builder.js') }}"></script>
+{% endblock %}

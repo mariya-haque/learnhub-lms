@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Tests · {{ app_name }}{% endblock %}
+{% block page_title %}Tests{% endblock %}
+{% block page_subtitle %}Practice as much as you like — grand tests are timed and count once{% endblock %}
+
+{% block content %}
+
+<div class="tabs">
+    <a href="/tests?kind=practice" class="tab {{ 'active' if kind == 'practice' }}">
+        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+        Practice <span class="tab-count">{{ counts.practice }}</span>
+    </a>
+    <a href="/tests?kind=grand" class="tab {{ 'active' if kind == 'grand' }}">
+        <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-timer"/></svg>
+        Grand <span class="tab-count">{{ counts.grand }}</span>
+    </a>
+</div>
+
+{% if kind == 'practice' %}
+<div class="alert alert-info mb">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-info"/></svg>
+    <span>Practice tests are untimed and unlimited. Each answer is checked as you pick it, with an explanation.</span>
+</div>
+{% else %}
+<div class="alert alert-warn mb">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-timer"/></svg>
+    <span>Grand tests are timed and usually allow one attempt. The clock keeps running if you close the tab, and answers stay hidden until you submit.</span>
+</div>
+{% endif %}
+
+{% if rows %}
+<div class="grid grid-2">
+    {% for row in rows %}
+    <div class="card">
+        <div class="row-between mb">
+            <span class="badge badge-{{ row.test.kind.value }}">
+                <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-{{ 'timer' if row.test.kind.value == 'grand' else 'clipboard' }}"/></svg>
+                {{ row.test.kind.value|title }}
+            </span>
+            {% if row.open %}<span class="badge badge-warn">In progress</span>{% endif %}
+        </div>
+
+        <div class="stack">
+            <span class="strong" style="font-size:14.5px">{{ row.test.title }}</span>
+            <a href="/courses/{{ row.course.slug }}" class="tiny" style="color:var(--accent)">{{ row.course.title }}</a>
+            <p class="small muted" style="margin-top:6px">{{ row.test.description or 'No description.' }}</p>
+        </div>
+
+        <div class="row wrap small muted" style="gap:14px;margin-top:12px">
+            <span class="row" style="gap:5px">
+                <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                {{ row.test.question_count }} questions
+            </span>
+            <span class="row" style="gap:5px">
+                <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-target"/></svg>
+                {{ row.test.total_marks }} marks
+            </span>
+            {% if row.test.duration_minutes %}
+            <span class="row" style="gap:5px">
+                <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+                {{ row.test.duration_minutes }} min
+            </span>
+            {% endif %}
+            <span class="row" style="gap:5px">
+                <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-award"/></svg>
+                pass {{ row.test.pass_percent }}%
+            </span>
+        </div>
+
+        {% if row.best %}
+        <div class="row-between mt" style="padding-top:12px;border-top:1px solid var(--border-light)">
+            <span class="small muted">Best of {{ row.attempts_used }} attempt{{ '' if row.attempts_used == 1 else 's' }}</span>
+            <span class="badge {{ 'badge-success' if row.best.passed else 'badge-error' }}">{{ row.best.percent }}%</span>
+        </div>
+        {% endif %}
+
+        <div class="btn-group mt">
+            {% if row.open %}
+                <a href="/attempts/{{ row.open.id }}" class="btn">Resume attempt</a>
+            {% elif row.test.max_attempts and row.attempts_used >= row.test.max_attempts %}
+                <button class="btn btn-outline" disabled>No attempts left</button>
+                {% if row.best %}<a href="/attempts/{{ row.best.id }}/result" class="btn btn-ghost">Review</a>{% endif %}
+            {% elif row.test.question_count == 0 %}
+                <button class="btn btn-outline" disabled>No questions yet</button>
+            {% else %}
+                <a href="/tests/{{ row.test.id }}/start" class="btn">
+                    <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play"/></svg>
+                    {{ 'Retake' if row.attempts_used else 'Start test' }}
+                </a>
+                {% if row.best %}<a href="/attempts/{{ row.best.id }}/result" class="btn btn-ghost">Last result</a>{% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card empty">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+    </div>
+    <div class="empty-title">No {{ kind }} tests available</div>
+    <p class="empty-desc">
+        Tests appear here once you're enrolled in a course that has published some.
+    </p>
+    <a href="/courses" class="btn mt">Browse courses</a>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset_url('css/style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📘</text></svg>">
+</head>
+<body>
+    {% include "_icons.html" %}
+
+    <div class="auth-shell">
+        <aside class="auth-aside">
+            <div class="auth-brand">
+                <svg width="24" height="24" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cap"/></svg>
+                {{ app_name }}
+            </div>
+
+            <div>
+                <h2 class="auth-headline">Lectures, notes and tests<br>in one quiet place.</h2>
+                <p class="auth-sub">
+                    Teachers publish a course once. Students watch, read, practise and sit
+                    the real thing — with every score tracked automatically.
+                </p>
+
+                <div class="auth-points">
+                    <div class="auth-point">
+                        <span class="auth-point-mark">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-play"/></svg>
+                        </span>
+                        <span>Video lectures that remember where you stopped</span>
+                    </div>
+                    <div class="auth-point">
+                        <span class="auth-point-mark">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file"/></svg>
+                        </span>
+                        <span>Downloadable notes attached to each lesson</span>
+                    </div>
+                    <div class="auth-point">
+                        <span class="auth-point-mark">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                        </span>
+                        <span>Practice tests with instant explanations</span>
+                    </div>
+                    <div class="auth-point">
+                        <span class="auth-point-mark">
+                            <svg width="13" height="13" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-timer"/></svg>
+                        </span>
+                        <span>Timed grand tests marked the moment you submit</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="small" style="opacity:.7">Built for classrooms, coaching centres and study groups.</p>
+        </aside>
+
+        <main class="auth-main">
+            <div class="auth-card fade-in">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <div id="toast-container"></div>
+    <script src="{{ asset_url('js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

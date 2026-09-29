@@ -1,0 +1,77 @@
+{% extends "auth_base.html" %}
+{% block title %}Sign in · {{ app_name }}{% endblock %}
+
+{% block content %}
+<h1 class="auth-title">Welcome back</h1>
+<p class="auth-caption">Sign in to pick up where you left off.</p>
+
+{% if error %}
+<div class="alert" role="alert">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg>
+    <span>{{ error }}</span>
+</div>
+{% endif %}
+
+<form method="post" action="/login" autocomplete="on">
+    <div class="field">
+        <label class="label" for="username">Username</label>
+        <div class="input-group">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-user"/></svg>
+            <input class="input" type="text" id="username" name="username" value="{{ username or '' }}"
+                   placeholder="your.username" required autofocus autocomplete="username">
+        </div>
+    </div>
+
+    <div class="field">
+        <label class="label" for="password">Password</label>
+        <div class="input-group">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg>
+            <input class="input" type="password" id="password" name="password"
+                   placeholder="Your password" required autocomplete="current-password">
+            <button type="button" class="input-action" onclick="togglePassword(this)" aria-label="Show password">
+                <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-lg btn-block mt">
+        Sign in
+        <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-right"/></svg>
+    </button>
+</form>
+
+<p class="auth-foot">New here? <a href="/register">Create an account</a></p>
+
+{# Demo credentials, for local use only. Hidden unless SHOW_DEMO_CREDENTIALS is
+   set: on a publicly reachable install this block is a login bypass, not a
+   convenience. The accounts still work -- they are simply no longer advertised. #}
+{% if show_demo_credentials %}
+<div class="demo-box">
+    <div class="demo-title">Demo accounts</div>
+    <div class="demo-row">
+        <span class="demo-cred">teacher / teacher123</span>
+        <button type="button" class="demo-fill" onclick="fillDemo('teacher','teacher123')">Use</button>
+    </div>
+    <div class="demo-row">
+        <span class="demo-cred">student / student123</span>
+        <button type="button" class="demo-fill" onclick="fillDemo('student','student123')">Use</button>
+    </div>
+    <div class="demo-row">
+        <span class="demo-cred">admin / admin123</span>
+        <button type="button" class="demo-fill" onclick="fillDemo('admin','admin123')">Use</button>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if show_demo_credentials %}
+<script>
+function fillDemo(username, password) {
+  document.getElementById('username').value = username;
+  document.getElementById('password').value = password;
+  document.querySelector('form').requestSubmit();
+}
+</script>
+{% endif %}
+{% endblock %}

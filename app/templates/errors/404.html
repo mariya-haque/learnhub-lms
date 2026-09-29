@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Not found · {{ app_name }}{% endblock %}
+{% block page_title %}Not found{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-code">404</div>
+    <h2 class="error-title">We couldn't find that page</h2>
+    <p class="error-desc">
+        {{ message or "The link may be out of date, or the item was removed by its owner." }}
+    </p>
+    <div class="btn-group mt">
+        <a href="{{ '/teach' if current_user and current_user.is_teacher else '/dashboard' }}" class="btn">
+            <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+            Back to safety
+        </a>
+        <a href="/courses" class="btn btn-outline">Browse courses</a>
+    </div>
+</div>
+{% endblock %}

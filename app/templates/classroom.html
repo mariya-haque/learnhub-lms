@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title }} · {{ app_name }}{% endblock %}
+{% block page_title %}{{ session.title }}{% endblock %}
+{% block page_subtitle %}{{ course.title }} · {{ session.duration_minutes }} minutes{% endblock %}
+
+{% block content %}
+
+<div class="row-between wrap mb">
+    <a href="/calendar" class="btn btn-ghost btn-sm">
+        <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-left"/></svg>
+        Back to calendar
+    </a>
+    <div class="row" style="gap:8px">
+        <span class="badge badge-{{ 'success' if session.state.value == 'live' else 'muted' }}">
+            {% if session.state.value == 'live' %}<span class="pulse-dot"></span>{% endif %}
+            {{ session.state.value|title }}
+        </span>
+        <span class="badge badge-muted" data-local-time="{{ session.starts_at_utc.isoformat() }}">
+            {{ session.starts_at_utc.strftime('%d %b, %H:%M') }} UTC
+        </span>
+    </div>
+</div>
+
+{% if allowed %}
+
+    {% if is_builtin %}
+    {# The room is embedded rather than linked so students never leave the app,
+       and so the enrollment check above is the only way in. #}
+    <div class="card classroom-frame">
+        <iframe
+            src="{{ embed_url }}"
+            title="Live class"
+            allow="camera; microphone; fullscreen; display-capture; autoplay; speaker-selection"
+            allowfullscreen></iframe>
+    </div>
+    <p class="tiny muted mt">
+        Trouble with camera or microphone? Your browser will ask for permission the
+        first time — allow it, then reload.
+        <a href="{{ join_url }}" target="_blank" rel="noopener">Open in a new tab</a> if the
+        frame stays blank.
+    </p>
+    {% else %}
+    <div class="card empty">
+        <div class="empty-icon">
+            <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-video"/></svg>
+        </div>
+        <div class="empty-title">This class runs on an external meeting link</div>
+        <p class="empty-desc">
+            {{ session.description or 'Your teacher is hosting this one outside LearnHub.' }}
+        </p>
+        <a href="{{ join_url }}" target="_blank" rel="noopener" class="btn mt">
+            <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-link"/></svg>
+            Join the meeting
+        </a>
+    </div>
+    {% endif %}
+
+{% else %}
+
+<div class="card empty" id="waiting-room" data-session="{{ session.id }}"
+     data-starts="{{ session.starts_at_utc.isoformat() }}">
+    <div class="empty-icon">
+        <svg width="22" height="22" class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+    </div>
+    <div class="empty-title" id="waiting-title">{{ reason }}</div>
+    <p class="empty-desc">
+        {% if session.state.value == 'upcoming' %}
+            This page unlocks itself when the room opens — no need to refresh.
+        {% elif session.state.value == 'cancelled' %}
+            Your teacher called this one off.
+        {% else %}
+            Ask your teacher whether a recording or a follow-up session is planned.
+        {% endif %}
+    </p>
+    <div class="countdown-large nums" id="waiting-countdown" hidden></div>
+    <a href="/calendar" class="btn btn-outline mt">Back to calendar</a>
+</div>
+
+{% endif %}
+
+{% if session.description and allowed and is_builtin %}
+<div class="card mt">
+    <div class="strong mb">About this class</div>
+    <p class="small muted">{{ session.description }}</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script id="classroom-data" type="application/json">{{ payload|tojson }}</script>
+<script src="{{ asset_url('js/classroom.js') }}"></script>
+{% endblock %}

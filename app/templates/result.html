@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Result · {{ test.title }}{% endblock %}
+{% block page_title %}{{ test.title }}{% endblock %}
+{% block page_subtitle %}{{ course.title }} · {{ 'submitted' if attempt.status.value == 'submitted' else 'time expired' }}{% endblock %}
+
+{% block content %}
+
+{% if attempt.status.value == 'expired' %}
+<div class="alert alert-warn">
+    <svg width="16" height="16" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg>
+    <span>The clock ran out, so this attempt was submitted automatically with the answers you had saved.</span>
+</div>
+{% endif %}
+
+<div class="score-hero mb">
+    <div class="score-ring" style="--pct: {{ attempt.percent }}; --score-color: {{ 'var(--success)' if attempt.passed else 'var(--error)' }}">
+        <div class="score-ring-inner">
+            <span class="score-pct">{{ attempt.percent|round|int }}%</span>
+            <span class="score-cap">score</span>
+        </div>
+    </div>
+
+    <div class="stack" style="gap:8px;flex:1;min-width:200px">
+        <span class="verdict {{ 'pass' if attempt.passed else 'fail' }}">
+            {{ 'Passed' if attempt.passed else 'Not passed' }}
+        </span>
+        <span class="muted">
+            You scored <strong class="nums">{{ attempt.score }}</strong> out of
+            <strong class="nums">{{ attempt.max_score }}</strong> marks.
+            The pass mark is {{ test.pass_percent }}%.
+        </span>
+        <div class="row wrap" style="gap:8px;margin-top:6px">
+            <span class="badge badge-success">
+                <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                {{ correct }} correct
+            </span>
+            <span class="badge badge-error">{{ incorrect }} wrong</span>
+            <span class="badge badge-muted">{{ unanswered }} skipped</span>
+            {% if test.negative_marking %}<span class="badge badge-warn">Negative marking applied</span>{% endif %}
+        </div>
+    </div>
+
+    <div class="stack" style="gap:8px">
+        {% if test.max_attempts and attempts_used >= test.max_attempts %}
+            <span class="badge badge-muted">No attempts left</span>
+        {% else %}
+            <a href="/tests/{{ test.id }}/start" class="btn">
+                <svg width="15" height="15" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clipboard"/></svg>
+                Try again
+            </a>
+        {% endif %}
+        <a href="/courses/{{ course.slug }}" class="btn btn-outline">Back to course</a>
+    </div>
+</div>
+
+<div class="section-head">
+    <div class="stack">
+        <span class="section-title">Answer review</span>
+        <span class="section-sub">Every question, with the correct answer and why</span>
+    </div>
+    <div class="tabs" style="margin-bottom:0">
+        <button class="tab active" data-filter="all">All <span class="tab-count">{{ rows|length }}</span></button>
+        <button class="tab" data-filter="incorrect">Wrong <span class="tab-count">{{ incorrect }}</span></button>
+        <button class="tab" data-filter="skipped">Skipped <span class="tab-count">{{ unanswered }}</span></button>
+    </div>
+</div>
+
+<div class="stack" style="gap:12px" id="review-list">
+    {% for row in rows %}
+    {% set state = 'correct' if row.is_correct else ('skipped' if not row.answered else 'incorrect') %}
+    <div class="review-item {{ state }}" data-state="{{ state }}">
+        <div class="row-between mb">
+            <span class="question-num">Question {{ row.number }}</span>
+            <div class="row" style="gap:7px">
+                <span class="badge nums {{ 'badge-success' if row.marks_awarded > 0 else ('badge-error' if row.marks_awarded < 0 else 'badge-muted') }}">
+                    {{ '+' if row.marks_awarded > 0 }}{{ row.marks_awarded }} / {{ row.question.marks }}
+                </span>
+                {% if row.is_correct %}
+                <span class="badge badge-success">
+                    <svg width="12" height="12" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                    Correct
+                </span>
+                {% elif not row.answered %}
+                <span class="badge badge-muted">Skipped</span>
+                {% else %}
+                <span class="badge badge-error">Wrong</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="question-text" style="font-size:14.5px">{{ row.question.text }}</div>
+
+        <div style="margin-top:12px">
+            {% if row.question.qtype.value == 'numeric' %}
+                <div class="review-choice correct">
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                    Correct answer: <strong class="nums">{{ row.question.numeric_answer }}</strong>
+                </div>
+                {% if row.answered %}
+                <div class="review-choice {{ 'correct' if row.is_correct else 'chosen-wrong' }}">
+                    You answered: <strong class="nums">{{ row.answer.numeric_value }}</strong>
+                </div>
+                {% endif %}
+            {% else %}
+                {% for choice in row.question.choices %}
+                {% set chosen = choice.id in row.selected_ids %}
+                <div class="review-choice {{ 'correct' if choice.is_correct else ('chosen-wrong' if chosen else '') }}">
+                    {% if choice.is_correct %}
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+                    {% elif chosen %}
+                    <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-close"/></svg>
+                    {% else %}
+                    <span style="width:14px"></span>
+                    {% endif %}
+                    <span style="flex:1">{{ choice.text }}</span>
+                    {% if chosen %}<span class="tiny strong">your answer</span>{% endif %}
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        {% if row.question.explanation %}
+        <div class="explain" style="margin-top:12px">
+            <div class="explain-head">
+                <svg width="14" height="14" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-info"/></svg>
+                Explanation
+            </div>
+            <div>{{ row.question.explanation }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Filter the review list without a round trip.
+document.querySelectorAll('.tab[data-filter]').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab[data-filter]').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    const filter = tab.dataset.filter;
+    document.querySelectorAll('#review-list [data-state]').forEach((item) => {
+      item.style.display = (filter === 'all' || item.dataset.state === filter) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}
